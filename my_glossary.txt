@@ -1,0 +1,43 @@
+== See also ==:== ดูเพิ่ม ==
+==See also==:==ดูเพิ่ม==
+== References ==:== อ้างอิง ==
+==References==:==อ้างอิง==
+==Etymology==:==ศัพทมูลวิทยา==
+== Etymology ==:== ศัพทมูลวิทยา ==
+== External link ==:== แหล่งข้อมูลอื่น ==
+==External link==:==แหล่งข้อมูลอื่น==
+==External links==:==แหล่งข้อมูลอื่น==
+== External links ==:== แหล่งข้อมูลอื่น ==
+{{Authority control}}:{{Authority control}}
+{{clear}}:{{clear}}
+{{Reflist|30em}}:{{รายการอ้างอิง|30em}}
+{{reflist|30em}}:{{รายการอ้างอิง|30em}}
+{{reflist|25em}}:{{รายการอ้างอิง|25em}}
+{{Reflist|2}}:{{รายการอ้างอิง|2}}
+{{reflist}}:{{รายการอ้างอิง}}
+{{Reflist}}:{{รายการอ้างอิง}}
+{{col-break}}:{{col-break}}
+{{col-begin}}:{{col-begin}}
+{{Notelist}}:{{รายการหมายเหตุ}}
+{{notelist}}:{{รายการหมายเหตุ}}
+==Notes==:==หมายเหตุ==
+== Notes ==:== หมายเหตุ ==
+== notes ==:== หมายเหตุ ==
+==notes==:==หมายเหตุ==
+==Further reading==:==อ่านเพิ่ม==
+== Further reading ==:== อ่านเพิ่ม ==
+{{colend}}:{{colend}}
+{{cols|colwidth=16em}}:{{cols|colwidth=16em}}
+{{Politics sidebar}}:{{แถบด้านข้างการเมือง}}
+{{politics}}:{{แถบด้านข้างการเมือง}}
+{{Political corruption sidebar}}:{{แถบด้านข้างการทุจริตทางการเมือง}}
+'''Notes''':===หมายเหตุ===
+'''Further reading''':===อ่านเพิ่ม===
+<gallery>:<gallery>
+</gallery>:</gallery>
+==Gallery==:== คลังภาพ ==
+== Gallery ==:== คลังภาพ ==
+{{Refbegin}}:{{เริ่มอ้างอิง}}
+{{refbegin}}:{{เริ่มอ้างอิง}}
+{{Refend}}:{{จบอ้างอิง}}
+{{refend}}:{{จบอ้างอิง}}
