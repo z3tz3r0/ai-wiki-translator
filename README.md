@@ -21,7 +21,7 @@ graph TD;
     C -->|Translation Request| D;
     D -->|Fetch Article| E[Wikipedia API];
     D -->|Translate Text| F[Google Cloud Translation API];
-    D -->|Process Complex Text| G[Google Generative AI (Gemini)];
+    D -->|Process Complex Text| G["Google Generative AI (Gemini)"];
     D -->|Apply Glossary| H[Custom Glossary];
     D -->|Output| I[Translated Article];
 ```
