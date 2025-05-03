@@ -14,16 +14,16 @@ The application offers both a command-line interface for batch processing and a 
 The Wiki Translator implements a hybrid architecture combining traditional machine translation with advanced AI capabilities:
 
 ```mermaid
-graph TD
-    A[User] -->|Web Interface| B[Flask Server]
-    A -->|Command Line| C[CLI Interface]
-    B -->|Translation Request| D[WikiTranslator]
-    C -->|Translation Request| D
-    D -->|Fetch Article| E[Wikipedia API]
-    D -->|Translate Text| F[Google Cloud Translation API]
-    D -->|Process Complex Text| G[Google Generative AI (Gemini)]
-    D -->|Apply Glossary| H[Custom Glossary]
-    D -->|Output| I[Translated Article]
+graph TD;
+    A[User] -->|Web Interface| B[Flask Server];
+    A -->|Command Line| C[CLI Interface];
+    B -->|Translation Request| D[WikiTranslator];
+    C -->|Translation Request| D;
+    D -->|Fetch Article| E[Wikipedia API];
+    D -->|Translate Text| F[Google Cloud Translation API];
+    D -->|Process Complex Text| G[Google Generative AI (Gemini)];
+    D -->|Apply Glossary| H[Custom Glossary];
+    D -->|Output| I[Translated Article];
 ```
 
 ### Backend Components
