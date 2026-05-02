@@ -18,12 +18,13 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.20.2
+  - repo: local
     hooks:
       - id: mypy
-        additional_dependencies:
-          - pydantic>=2.13
-          - pydantic-settings>=2.14
+        name: mypy (uv run, full project venv)
+        entry: uv run mypy
+        language: system
+        types: [python]
         args: [--config-file=pyproject.toml]
         files: ^(app|tests)/
+        require_serial: true
