@@ -9,3 +9,14 @@ build/
 .env
 .vscode/
 .cache/
+# Python tooling
+.coverage
+.coverage.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+# Frontend build artifacts (Vite)
+frontend/dist/
+# Added by code-review-graph
+.code-review-graph/

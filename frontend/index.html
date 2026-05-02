@@ -1,105 +1,13 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Wiki Translator</title>
-    <link rel="stylesheet" href="/css/styles.css" />
+    <title>frontend</title>
   </head>
   <body>
-    <div class="container">
-      <header>
-        <h1>Wiki Translator</h1>
-        <p>
-          Translate Wikipedia articles from English to Thai using Gemini AI from
-          Google
-        </p>
-      </header>
-
-      <main>
-        <section id="input-section">
-          <form id="translation-form">
-            <div class="form-group">
-              <label for="article-title">English Article Title:</label>
-              <input
-                type="text"
-                id="article-title"
-                name="article-title"
-                required
-                placeholder="e.g., Narcissism"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="thai-title">Thai Article Title:</label>
-              <input
-                type="text"
-                id="thai-title"
-                name="thai-title"
-                required
-                placeholder="e.g., ความหลงตนเอง"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="custom-glossary">Custom Glossary (Optional):</label>
-              <textarea
-                id="custom-glossary"
-                name="custom-glossary"
-                placeholder="Format: English term:Thai translation&#10;Example:&#10;Narcissism:ความหลงตนเอง&#10;self-love:รักตัวเอง"
-              ></textarea>
-            </div>
-
-            <div class="form-actions">
-              <button type="submit" id="submit-btn">Translate</button>
-            </div>
-          </form>
-        </section>
-
-        <section id="progress-section" class="hidden">
-          <h2>Translation Progress</h2>
-          <div class="status-container">
-            <p id="status-message">Initializing translation...</p>
-            <div class="loader"></div>
-          </div>
-          <div class="job-details">
-            <p><strong>Article:</strong> <span id="job-title"></span></p>
-            <p>
-              <strong>Thai Title:</strong> <span id="job-thai-title"></span>
-            </p>
-            <p><strong>Job ID:</strong> <span id="job-id"></span></p>
-          </div>
-          <button id="cancel-btn" class="secondary-btn">Cancel</button>
-        </section>
-
-        <section id="result-section" class="hidden">
-          <h2>Translation Result</h2>
-          <div class="result-actions">
-            <button id="copy-btn">Copy to Clipboard</button>
-            <button id="download-btn">Download as Text File</button>
-            <button id="new-translation-btn" class="secondary-btn">
-              New Translation
-            </button>
-          </div>
-          <div class="result-content">
-            <pre id="translation-result"></pre>
-          </div>
-        </section>
-
-        <section id="error-section" class="hidden">
-          <h2>Error</h2>
-          <div class="error-container">
-            <p id="error-message"></p>
-            <button id="try-again-btn" class="secondary-btn">Try Again</button>
-          </div>
-        </section>
-      </main>
-
-      <footer>
-        <p>&copy; 2025 Wiki Translator</p>
-      </footer>
-    </div>
-
-    <script src="/js/script.js"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/index.tsx"></script>
   </body>
 </html>
