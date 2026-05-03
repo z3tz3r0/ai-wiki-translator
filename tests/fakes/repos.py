@@ -12,7 +12,7 @@ class FakePromptRepo:
     """
 
     def __init__(self, templates: dict[str, str] | None = None) -> None:
-        self._templates: dict[str, str] = templates or {}
+        self._templates: dict[str, str] = dict(templates or {})
 
     async def load(self, template_id: str) -> str:
         return self._templates[template_id]
@@ -25,7 +25,7 @@ class FakeGlossaryRepo:
     """
 
     def __init__(self, glossary: Glossary | None = None) -> None:
-        self._glossary: Glossary = glossary or {}
+        self._glossary: Glossary = dict(glossary or {})
 
     async def load(self, path: str | None) -> Glossary:
         return dict(self._glossary)

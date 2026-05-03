@@ -35,7 +35,7 @@ def is_acceptable_source(article: Article, gate: QualityGate) -> ValidationResul
     if ref_count < gate.min_ref_count:
         reasons.append(f"ref count {ref_count} below threshold {gate.min_ref_count}")
 
-    for header in gate.required_sections:
+    for header in sorted(gate.required_sections):
         if header not in article.wikitext:
             reasons.append(f"required section missing: {header}")
 
