@@ -26,6 +26,21 @@ from app.infrastructure.wikimedia_mint import WikimediaMinTAdapter
 from app.infrastructure.wikipedia_http import DEFAULT_USER_AGENT, WikipediaHttpReader
 
 
+def _read_gemini_keys() -> list[str]:
+    """Resolve Gemini API keys from env, preferring multi-key if both are set.
+
+    `GEMINI_API_KEYS` takes a comma-separated list (e.g. `k1,k2,k3`) for
+    rotation; `GEMINI_API_KEY` is the single-key fallback. Whitespace
+    around each entry is trimmed and empty entries are dropped.
+    """
+    multi = os.environ.get("GEMINI_API_KEYS", "")
+    keys = [k.strip() for k in multi.split(",") if k.strip()]
+    if keys:
+        return keys
+    single = os.environ.get("GEMINI_API_KEY", "").strip()
+    return [single] if single else []
+
+
 def _resolve_prompts_dir() -> Path:
     env = os.environ.get("WIKI_TRANSLATOR_PROMPTS_DIR")
     if env:
@@ -55,11 +70,17 @@ def build_translate_use_case(*, output_dir: Path | None = None) -> TranslateArti
     wikidata = WikidataHttpReader(user_agent=user_agent)
     machine = WikimediaMinTAdapter(user_agent=user_agent)
 
-    gemini_api_key = os.environ.get("GEMINI_API_KEY")
-    if not gemini_api_key:
-        raise RuntimeError("GEMINI_API_KEY is required · export it before running `wiki-translate`")
+    gemini_keys = _read_gemini_keys()
+    if not gemini_keys:
+        raise RuntimeError(
+            "GEMINI_API_KEY (single) or GEMINI_API_KEYS (comma-separated) must be set · "
+            "export at least one before running `wiki-translate`"
+        )
     gemini_model = os.environ.get("WIKI_TRANSLATOR_GEMINI_MODEL", "gemini-flash-lite-latest")
-    llm = GeminiAssistantAdapter(client=genai.Client(api_key=gemini_api_key), model=gemini_model)
+    llm = GeminiAssistantAdapter(
+        clients=[genai.Client(api_key=k) for k in gemini_keys],
+        model=gemini_model,
+    )
 
     return TranslateArticleUseCase(
         wikipedia=wikipedia,
