@@ -1,6 +1,8 @@
-"""Stub for `summarize_diff` · Phase 3 will replace the body with a real diff."""
+"""`summarize_diff` · unified diff between current th.wiki text and proposal."""
 
 from __future__ import annotations
+
+import difflib
 
 from app.application.dto import ReviewNotes, SourceScore, ValidationResult
 
@@ -12,19 +14,36 @@ def summarize_diff(
     current_th_wikitext: str,
     proposed_wikitext: str,
 ) -> ReviewNotes:
-    """Wrap metadata in a `ReviewNotes` dataclass.
+    """Wrap metadata + a markdown diff block in a `ReviewNotes` dataclass.
 
-    Phase 2 stub · returns the source/validation metadata with an empty
-    `diff_summary`. Phase 3 will replace the body with a section-aware
-    diff between `current_th_wikitext` and `proposed_wikitext` so the
-    reviewer can spot Thai-only context worth preserving.
+    The diff body is one of:
+      * `(new article)` if `current_th_wikitext` is blank/whitespace
+      * `(no changes)` if `current_th_wikitext == proposed_wikitext`
+      * a fenced ```diff block (unified diff) otherwise
+
+    The reviewer reads this in `<slug>.review.md` before pasting wikitext
+    into th.wiki. Whitespace-only current text counts as "new" because a
+    page that exists with only template scaffolding is effectively empty.
     """
-    # Parameters are intentionally accepted now to lock in the signature;
-    # Phase 3 implementation will consume them.
-    _ = (current_th_wikitext, proposed_wikitext)
     return ReviewNotes(
         source_lang=source_lang,
         source_score=source_score,
         validation=validation,
-        diff_summary="",
+        diff_summary=_render_diff(current_th_wikitext, proposed_wikitext),
     )
+
+
+def _render_diff(current: str, proposed: str) -> str:
+    if not current.strip():
+        return "(new article)"
+    if current == proposed:
+        return "(no changes)"
+    diff_lines = difflib.unified_diff(
+        current.splitlines(keepends=False),
+        proposed.splitlines(keepends=False),
+        fromfile="current",
+        tofile="proposed",
+        lineterm="",
+    )
+    body = "\n".join(diff_lines)
+    return f"```diff\n{body}\n```"
