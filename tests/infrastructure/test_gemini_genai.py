@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import os
+import time
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 
 from app.application.ports import LLMTranslator
-from app.infrastructure.gemini_genai import GeminiAssistantAdapter
+from app.infrastructure.gemini_genai import GeminiAssistantAdapter, _retry_delay_seconds
 
 
 def _make_fake_client(
@@ -84,6 +85,109 @@ async def test_translate_section_propagates_client_exception() -> None:
     adapter = GeminiAssistantAdapter(client=client)
     with pytest.raises(RuntimeError, match="RPC"):
         await adapter.translate_section("body", "sys")
+
+
+# --- throttling and retry --------------------------------------------------
+
+
+async def test_translate_section_throttles_consecutive_calls() -> None:
+    """Second call must wait so the effective rate stays under `requests_per_minute`."""
+    client, _ = _make_fake_client()
+    # 60 RPM = 1s spacing · keeps the test snappy while still asserting the wait happens
+    adapter = GeminiAssistantAdapter(client=client, requests_per_minute=60)
+
+    start = time.monotonic()
+    await adapter.translate_section("a", "sys")
+    await adapter.translate_section("b", "sys")
+    elapsed = time.monotonic() - start
+    # First call has no wait; second call waits ~1s. Lower bound 0.9 to allow scheduler jitter.
+    assert elapsed >= 0.9, f"second call did not throttle · elapsed={elapsed:.3f}s"
+
+
+async def test_translate_section_retries_once_on_429() -> None:
+    """A 429 with `code` attribute triggers one retry · second attempt succeeds."""
+    calls: list[int] = []
+
+    class RateLimit(Exception):
+        code: ClassVar[int] = 429
+        details: ClassVar[list[dict[str, Any]]] = [
+            {
+                "@type": "type.googleapis.com/google.rpc.RetryInfo",
+                "retryDelay": "0s",
+            }
+        ]
+
+    async def flaky(*, model: str, contents: Any, config: Any) -> SimpleNamespace:
+        calls.append(1)
+        if len(calls) == 1:
+            raise RateLimit("rate limit")
+        return SimpleNamespace(text="recovered")
+
+    client = SimpleNamespace(aio=SimpleNamespace(models=SimpleNamespace(generate_content=flaky)))
+    adapter = GeminiAssistantAdapter(client=client)
+    out = await adapter.translate_section("body", "sys")
+    assert out == "recovered"
+    assert len(calls) == 2
+
+
+async def test_translate_section_does_not_retry_non_429_errors() -> None:
+    """Non-429 exceptions raise immediately without retrying."""
+    calls: list[int] = []
+
+    async def boom(*, model: str, contents: Any, config: Any) -> SimpleNamespace:
+        calls.append(1)
+        raise RuntimeError("non-rate-limit failure")
+
+    client = SimpleNamespace(aio=SimpleNamespace(models=SimpleNamespace(generate_content=boom)))
+    adapter = GeminiAssistantAdapter(client=client)
+    with pytest.raises(RuntimeError, match="non-rate-limit"):
+        await adapter.translate_section("body", "sys")
+    assert len(calls) == 1
+
+
+async def test_translate_section_reraises_after_retries_exhausted() -> None:
+    """If every retry hits 429, the last exception is propagated."""
+
+    class RateLimit(Exception):
+        code: ClassVar[int] = 429
+        details: ClassVar[list[dict[str, Any]]] = [
+            {
+                "@type": "type.googleapis.com/google.rpc.RetryInfo",
+                "retryDelay": "0s",
+            }
+        ]
+
+    async def always_429(*, model: str, contents: Any, config: Any) -> SimpleNamespace:
+        raise RateLimit("rate limit")
+
+    client = SimpleNamespace(
+        aio=SimpleNamespace(models=SimpleNamespace(generate_content=always_429))
+    )
+    adapter = GeminiAssistantAdapter(client=client, max_retries=1)
+    with pytest.raises(RateLimit):
+        await adapter.translate_section("body", "sys")
+
+
+def test_retry_delay_seconds_parses_retry_info() -> None:
+    """Pulls the `retryDelay` field from RetryInfo details, drops the trailing 's'."""
+
+    class RateLimit(Exception):
+        details: ClassVar[list[dict[str, Any]]] = [
+            {"@type": "type.googleapis.com/google.rpc.QuotaFailure"},
+            {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "31s"},
+        ]
+
+    assert _retry_delay_seconds(RateLimit()) == 31.0
+
+
+def test_retry_delay_seconds_falls_back_to_60_when_missing() -> None:
+    """Defaults to 60s when no RetryInfo is present or details are malformed."""
+    assert _retry_delay_seconds(RuntimeError("plain")) == 60.0
+
+    class WithMalformed(Exception):
+        details = "not a list"
+
+    assert _retry_delay_seconds(WithMalformed()) == 60.0
 
 
 # --- integration -----------------------------------------------------------

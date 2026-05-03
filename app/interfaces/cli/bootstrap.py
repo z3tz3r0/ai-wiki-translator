@@ -58,7 +58,7 @@ def build_translate_use_case(*, output_dir: Path | None = None) -> TranslateArti
     gemini_api_key = os.environ.get("GEMINI_API_KEY")
     if not gemini_api_key:
         raise RuntimeError("GEMINI_API_KEY is required · export it before running `wiki-translate`")
-    gemini_model = os.environ.get("WIKI_TRANSLATOR_GEMINI_MODEL", "gemini-2.0-flash")
+    gemini_model = os.environ.get("WIKI_TRANSLATOR_GEMINI_MODEL", "gemini-flash-lite-latest")
     llm = GeminiAssistantAdapter(client=genai.Client(api_key=gemini_api_key), model=gemini_model)
 
     return TranslateArticleUseCase(
