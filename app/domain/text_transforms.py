@@ -16,18 +16,33 @@ _QUOTE_CONTENT_RE = re.compile(r"\{\{(?:blockquote|quote)\|(.*)\}\}", re.DOTALL)
 _BULLET_CONTENT_RE = re.compile(r"^[•\*]+\s*(.*)")
 
 
+def _replace_group(text: str, match: re.Match[str], group: int, replacement: str) -> str:
+    """Splice `replacement` into `text` at the span of capture `group` in `match`.
+
+    Avoids the bug where `text.replace(match.group(N), replacement)` would
+    replace every occurrence of the captured substring, not just the matched
+    span. Use this when the captured text could appear elsewhere in `text`.
+    """
+    start, end = match.span(group)
+    return f"{text[:start]}{replacement}{text[end:]}"
+
+
 def parse_glossary_lines(lines: list[str]) -> Glossary:
     """Parse glossary text lines in `term:translation` format.
 
     Lines without `:` are skipped silently. Whitespace around term and
-    translation is stripped.
+    translation is stripped. Lines whose term is empty after stripping
+    (e.g. `:value` or `   :value`) are also skipped.
     """
     glossary: Glossary = {}
     for line in lines:
         if ":" not in line:
             continue
         term, translation = line.strip().split(":", 1)
-        glossary[term.strip()] = translation.strip()
+        term = term.strip()
+        if not term:
+            continue
+        glossary[term] = translation.strip()
     return glossary
 
 
@@ -68,7 +83,7 @@ def replace_image_description(
         return text
     description = match.group(1)
     translated = translate(replace_with_dictionary(description, dictionary, translate))
-    return text.replace(description, translated).replace("File:", "ไฟล์:")
+    return _replace_group(text, match, 1, translated).replace("File:", "ไฟล์:", 1)
 
 
 def replace_quote(
@@ -82,7 +97,7 @@ def replace_quote(
         return text
     content = match.group(1)
     translated = translate(replace_with_dictionary(content, dictionary, translate))
-    return text.replace(content, translated)
+    return _replace_group(text, match, 1, translated)
 
 
 def replace_bullet_point(
@@ -96,4 +111,4 @@ def replace_bullet_point(
         return text
     content = match.group(1)
     translated = translate(replace_with_dictionary(content, dictionary, translate))
-    return text.replace(content, translated)
+    return _replace_group(text, match, 1, translated)

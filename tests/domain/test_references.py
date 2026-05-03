@@ -54,3 +54,14 @@ def test_split_into_blocks_basic() -> None:
     assert "==Header==" in blocks
     assert any("Paragraph text." in b for b in blocks)
     assert all(b.strip() for b in blocks)
+
+
+def test_strip_references_sequential() -> None:
+    """Verify that multiple refs receive incrementing [1], [2] placeholders."""
+    text = "a<ref>first</ref>b<ref name='x' />c"
+    out, ref_map = strip_references(text)
+    assert out == "a[1]b[2]c"
+    assert ref_map == {
+        "[1]": "<ref>first</ref>",
+        "[2]": "<ref name='x' />",
+    }

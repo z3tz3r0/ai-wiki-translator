@@ -30,12 +30,17 @@ def test_replace_with_dictionary_known_link() -> None:
 
 def test_replace_image_description() -> None:
     out = replace_image_description("[[File:X.jpg|thumb|A dog]]\n", {}, _identity)
-    assert "ไฟล์:" in out
+    assert out == "[[ไฟล์:X.jpg|thumb|A dog]]\n"
 
 
 def test_replace_quote_content() -> None:
     out = replace_quote("{{quote|Hello world}}", {}, str.upper)
     assert out == "{{quote|HELLO WORLD}}"
+
+
+def test_replace_blockquote_content() -> None:
+    out = replace_quote("{{blockquote|Hello world}}", {}, str.upper)
+    assert out == "{{blockquote|HELLO WORLD}}"
 
 
 def test_replace_bullet_point() -> None:

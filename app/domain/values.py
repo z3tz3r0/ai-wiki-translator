@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from enum import StrEnum
 from typing import NewType
 
@@ -10,7 +11,7 @@ ArticleTitle = NewType("ArticleTitle", str)
 JobId = NewType("JobId", uuid.UUID)
 
 type Glossary = dict[str, str]
-type Dictionary = dict[str, str]
+type Dictionary = Mapping[str, str]
 
 
 class SectionType(StrEnum):

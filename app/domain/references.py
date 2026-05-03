@@ -9,9 +9,11 @@ import re
 # multi-line comments and `>` characters inside comment bodies are handled.
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 
-# Ports legacy `wikipedia_client.py:_strip_reference_tags` regex verbatim.
-# Matches both `<ref>body</ref>` and self-closing `<ref name='x' />`.
-_REF_TAG_RE = re.compile(r"<ref(?:[^>]*)?>(?:[^<]*</ref>)?")
+# Matches both `<ref>body</ref>` (with possibly nested tags inside body) and
+# self-closing `<ref name='x' />`. The body uses `.*?` with re.DOTALL so
+# nested HTML/wikitext like <nowiki>...</nowiki> inside the ref is consumed
+# fully · the legacy `[^<]*` pattern dropped on the first nested `<`.
+_REF_TAG_RE = re.compile(r"<ref(?:[^>]*?)(?:/>|>.*?</ref>)", re.DOTALL)
 
 # `[N]` placeholders inserted by strip_references.
 _REF_PLACEHOLDER_RE = re.compile(r"\[(\d+)\]")
