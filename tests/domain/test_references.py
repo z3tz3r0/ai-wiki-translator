@@ -65,3 +65,11 @@ def test_strip_references_sequential() -> None:
         "[1]": "<ref>first</ref>",
         "[2]": "<ref name='x' />",
     }
+
+
+def test_strip_references_nested_tags() -> None:
+    """Regression: _REF_TAG_RE must not stop at the first `>` inside a ref body."""
+    text = "text<ref><cite>Author, 2024</cite></ref>tail"
+    out, ref_map = strip_references(text)
+    assert out == "text[1]tail"
+    assert ref_map == {"[1]": "<ref><cite>Author, 2024</cite></ref>"}

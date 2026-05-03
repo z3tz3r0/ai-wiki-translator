@@ -124,3 +124,57 @@ def test_job_mark_failed_from_done_raises() -> None:
     job.mark_done("result")
     with pytest.raises(ValueError, match="status"):
         job.mark_failed("late failure")
+
+
+def test_job_done_without_result_raises() -> None:
+    with pytest.raises(ValueError, match="result"):
+        TranslationJob(
+            job_id=JobId(uuid.uuid4()),
+            title=ArticleTitle("T"),
+            status=JobStatus.DONE,
+            result=None,
+        )
+
+
+def test_job_failed_without_error_raises() -> None:
+    with pytest.raises(ValueError, match="error"):
+        TranslationJob(
+            job_id=JobId(uuid.uuid4()),
+            title=ArticleTitle("T"),
+            status=JobStatus.FAILED,
+            error=None,
+        )
+
+
+def test_job_pending_with_result_raises() -> None:
+    with pytest.raises(ValueError, match="result"):
+        TranslationJob(
+            job_id=JobId(uuid.uuid4()),
+            title=ArticleTitle("T"),
+            status=JobStatus.PENDING,
+            result="early result",
+        )
+
+
+def test_job_pending_with_error_raises() -> None:
+    with pytest.raises(ValueError, match="error"):
+        TranslationJob(
+            job_id=JobId(uuid.uuid4()),
+            title=ArticleTitle("T"),
+            status=JobStatus.PENDING,
+            error="premature error",
+        )
+
+
+def test_mark_done_with_empty_result_raises() -> None:
+    job = _make_job()
+    job.mark_running()
+    with pytest.raises(ValueError, match="result"):
+        job.mark_done("")
+
+
+def test_mark_failed_with_empty_error_raises() -> None:
+    job = _make_job()
+    job.mark_running()
+    with pytest.raises(ValueError, match="error"):
+        job.mark_failed("")

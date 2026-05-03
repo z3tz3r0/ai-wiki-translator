@@ -73,12 +73,16 @@ class TranslationJob:
     def mark_done(self, result: str) -> None:
         if self.status is not JobStatus.RUNNING:
             raise ValueError(f"cannot complete a job in status {self.status.value}")
+        if not result:
+            raise ValueError("result must not be empty")
         self.status = JobStatus.DONE
         self.result = result
 
     def mark_failed(self, error: str) -> None:
         if self.status not in (JobStatus.PENDING, JobStatus.RUNNING):
             raise ValueError(f"cannot fail a job in status {self.status.value}")
+        if not error:
+            raise ValueError("error must not be empty")
         self.status = JobStatus.FAILED
         self.error = error
 
