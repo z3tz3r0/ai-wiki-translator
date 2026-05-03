@@ -3,7 +3,7 @@ name = "ai-wiki-translator"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi[standard]>=0.136.1",
+    "fastapi>=0.136.1",
     "google-genai>=1.74.0",
     "httpx>=0.28.1",
     "pydantic-settings>=2.14.0",
