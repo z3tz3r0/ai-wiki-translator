@@ -1,13 +1,11 @@
-"""Domain value objects: enums, NewTypes, and type aliases."""
+"""Domain value objects: enums and type aliases."""
 
 from __future__ import annotations
 
-import uuid
 from enum import StrEnum
 from typing import NewType
 
 ArticleTitle = NewType("ArticleTitle", str)
-JobId = NewType("JobId", uuid.UUID)
 
 type Glossary = dict[str, str]
 type Dictionary = dict[str, str]
@@ -28,11 +26,3 @@ class SectionType(StrEnum):
 class ExecutionMode(StrEnum):
     ASYNC = "ASYNC"
     FIFO = "FIFO"
-
-
-class JobStatus(StrEnum):
-    PENDING = "pending"
-    RUNNING = "running"
-    DONE = "done"
-    CANCELLED = "cancelled"
-    FAILED = "failed"

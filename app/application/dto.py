@@ -16,7 +16,7 @@ class SourceScore:
     word_count: int
     ref_count: int
     locale_match: bool
-    winning_signal: Literal["locale", "fallback_en", "first_langlink"]
+    winning_signal: Literal["locale", "fallback_en", "first_langlink", "override", "error"]
 
 
 @dataclass(frozen=True)
@@ -34,7 +34,7 @@ class ReviewNotes:
     source_lang: str
     source_score: SourceScore
     validation: ValidationResult
-    diff_summary: str  # markdown block; empty until Phase 3 wires summarize_diff
+    diff_summary: str  # markdown block · `(new article)`, `(no changes)`, or fenced unified diff
 
 
 @dataclass(frozen=True)
