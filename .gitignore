@@ -21,3 +21,5 @@ htmlcov/
 frontend/dist/
 # Added by code-review-graph
 .code-review-graph/
+# Autoresearch optimization scaffold (its own nested git repo)
+autoresearch/
