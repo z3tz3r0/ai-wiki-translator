@@ -38,8 +38,6 @@ packages = ["app"]
 line-length = 100
 target-version = "py313"
 exclude = [
-    "legacy_app",
-    "legacy_frontend",
     ".venv",
     "frontend",
     "main.py",
@@ -81,7 +79,7 @@ warn_unused_ignores = true
 warn_return_any = true
 no_implicit_optional = true
 strict_equality = true
-exclude = ["legacy_app", "legacy_frontend", "frontend", "\\.venv"]
+exclude = ["frontend", "\\.venv"]
 
 [tool.pytest.ini_options]
 minversion = "9.0"
