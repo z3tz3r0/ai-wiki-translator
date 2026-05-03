@@ -16,10 +16,13 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from dotenv import load_dotenv
 
 from app.application.dto import Draft, TranslateArticleCommand
 from app.application.use_cases.run_queued import parse_queue_toml
 from app.interfaces.cli import bootstrap as bootstrap
+
+load_dotenv()
 
 _DEFAULT_QUEUE_PATH: Path = Path.home() / ".config" / "wiki-translator" / "queue.toml"
 
