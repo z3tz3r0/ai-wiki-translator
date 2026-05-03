@@ -21,6 +21,7 @@ from app.infrastructure.file_glossary_repo import FileGlossaryRepository
 from app.infrastructure.file_prompt_repo import FilePromptRepository
 from app.infrastructure.gemini_genai import GeminiAssistantAdapter
 from app.infrastructure.markdown_draft_storage import MarkdownDraftStorage
+from app.infrastructure.self_consistent_llm import SelfConsistentLLMTranslator
 from app.infrastructure.wikidata_http import WikidataHttpReader
 from app.infrastructure.wikimedia_mint import WikimediaMinTAdapter
 from app.infrastructure.wikipedia_http import DEFAULT_USER_AGENT, WikipediaHttpReader
@@ -77,9 +78,13 @@ def build_translate_use_case(*, output_dir: Path | None = None) -> TranslateArti
             "export at least one before running `wiki-translate`"
         )
     gemini_model = os.environ.get("WIKI_TRANSLATOR_GEMINI_MODEL", "gemini-flash-lite-latest")
-    llm = GeminiAssistantAdapter(
-        clients=[genai.Client(api_key=k) for k in gemini_keys],
-        model=gemini_model,
+    samples = int(os.environ.get("WIKI_TRANSLATOR_LLM_SAMPLES", "3"))
+    llm = SelfConsistentLLMTranslator(
+        inner=GeminiAssistantAdapter(
+            clients=[genai.Client(api_key=k) for k in gemini_keys],
+            model=gemini_model,
+        ),
+        samples=samples,
     )
 
     return TranslateArticleUseCase(
