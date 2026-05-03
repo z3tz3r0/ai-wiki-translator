@@ -111,13 +111,13 @@ def translate_queue(
     """Run translations for every entry in a TOML queue."""
     queue_path = config if config is not None else _DEFAULT_QUEUE_PATH
     if not queue_path.is_file():
-        typer.echo(f"queue file not found: {queue_path}")
+        typer.echo(f"queue file not found: {queue_path}", err=True)
         raise typer.Exit(code=2)
     text = queue_path.read_text(encoding="utf-8")
     try:
         commands = parse_queue_toml(text)
     except (ValueError, KeyError, TypeError) as exc:
-        typer.echo(f"queue parse error: {exc}")
+        typer.echo(f"queue parse error: {exc}", err=True)
         raise typer.Exit(code=2) from exc
     if not commands:
         typer.echo("(queue is empty)")

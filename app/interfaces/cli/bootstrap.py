@@ -18,9 +18,7 @@ from app.infrastructure.gemini_genai import GeminiAssistantAdapter
 from app.infrastructure.google_translate import GoogleTranslateAdapter
 from app.infrastructure.markdown_draft_storage import MarkdownDraftStorage
 from app.infrastructure.wikidata_http import WikidataHttpReader
-from app.infrastructure.wikipedia_http import WikipediaHttpReader
-
-_DEFAULT_USER_AGENT = "ai-wiki-translator/0.1 (https://github.com/z3tz3r0/ai-wiki-translator)"
+from app.infrastructure.wikipedia_http import DEFAULT_USER_AGENT, WikipediaHttpReader
 
 
 def _resolve_prompts_dir() -> Path:
@@ -48,7 +46,7 @@ def build_translate_use_case(*, output_dir: Path | None = None) -> TranslateArti
     from google import genai
     from google.cloud import translate_v3
 
-    user_agent = os.environ.get("WIKI_TRANSLATOR_USER_AGENT", _DEFAULT_USER_AGENT)
+    user_agent = os.environ.get("WIKI_TRANSLATOR_USER_AGENT", DEFAULT_USER_AGENT)
     wikipedia = WikipediaHttpReader(user_agent=user_agent)
     wikidata = WikidataHttpReader(user_agent=user_agent)
 
