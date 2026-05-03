@@ -4,7 +4,6 @@ version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi[standard]>=0.136.1",
-    "google-cloud-translate>=3.26.0",
     "google-genai>=1.74.0",
     "httpx>=0.28.1",
     "pydantic-settings>=2.14.0",
@@ -82,10 +81,6 @@ warn_return_any = true
 no_implicit_optional = true
 strict_equality = true
 exclude = ["legacy_app", "legacy_frontend", "frontend", "\\.venv"]
-
-[[tool.mypy.overrides]]
-module = ["google.cloud.*"]
-ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "9.0"
