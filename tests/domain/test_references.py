@@ -54,3 +54,26 @@ def test_split_into_blocks_basic() -> None:
     assert "==Header==" in blocks
     assert any("Paragraph text." in b for b in blocks)
     assert all(b.strip() for b in blocks)
+
+
+def test_strip_references_sequential_numbering() -> None:
+    """Multiple refs receive incrementing [1], [2] placeholders in source order."""
+    text = "a<ref>first</ref>b<ref name='x' />c"
+    out, ref_map = strip_references(text)
+    assert out == "a[1]b[2]c"
+    assert ref_map == {
+        "[1]": "<ref>first</ref>",
+        "[2]": "<ref name='x' />",
+    }
+
+
+def test_strip_references_nested_tags() -> None:
+    """Regression: _REF_TAG_RE must not stop at the first `<` inside the body.
+
+    Legacy `[^<]*` would truncate at the inner `<cite>` tag and mis-pair the
+    outer `</ref>`. The fix uses `.*?` with re.DOTALL.
+    """
+    text = "text<ref><cite>Author, 2024</cite></ref>tail"
+    out, ref_map = strip_references(text)
+    assert out == "text[1]tail"
+    assert ref_map == {"[1]": "<ref><cite>Author, 2024</cite></ref>"}

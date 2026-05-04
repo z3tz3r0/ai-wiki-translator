@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from app.domain.values import ExecutionMode, Glossary, SectionType
+from app.domain.values import Dictionary, ExecutionMode, SectionType
 
 # Bug-fix vs legacy: legacy lookahead `(?=\n)` only matched if a `\n` followed
 # the closing `]]`. Stripped blocks (no trailing newline) silently fell through
@@ -37,7 +37,7 @@ _VALUED_TEMPLATE_RE = re.compile(r"^\{\{[^{}=\n]*\|[^{}=\n]*\}\}$")
 _TEMPLATE_PARAMS_RE = re.compile(r"^\s*\|\s*\w+\s*=", re.MULTILINE)
 
 
-def classify_section(block: str, glossary: Glossary) -> SectionType:
+def classify_section(block: str, glossary: Dictionary) -> SectionType:
     """Classify a wikitext block. Mirrors legacy `_determine_section_type` order."""
     if block in glossary:
         return SectionType.GLOSSARY

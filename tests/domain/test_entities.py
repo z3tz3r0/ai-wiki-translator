@@ -42,6 +42,6 @@ def test_article_empty_title_raises() -> None:
             wikitext="",
             wikitext_no_ref="",
             ref_map={},
-            wikilinks=[],
+            wikilinks=(),
             dictionary={},
         )

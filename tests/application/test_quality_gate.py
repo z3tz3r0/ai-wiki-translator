@@ -20,7 +20,7 @@ def _article(
         wikitext=f"{body}\n{extra_wikitext}",
         wikitext_no_ref=body,
         ref_map={f"[{i}]": f"<ref>{i}</ref>" for i in range(1, ref_count + 1)},
-        wikilinks=[],
+        wikilinks=(),
         dictionary={},
     )
 

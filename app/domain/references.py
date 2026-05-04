@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 
 # Bug-fix vs legacy: legacy pattern `r"<!--[^>]*>"` closes on the first `>`
 # inside a comment. Use the standard non-greedy `.*?-->` with re.DOTALL so
 # multi-line comments and `>` characters inside comment bodies are handled.
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 
-# Ports legacy `wikipedia_client.py:_strip_reference_tags` regex verbatim.
-# Matches both `<ref>body</ref>` and self-closing `<ref name='x' />`.
-_REF_TAG_RE = re.compile(r"<ref(?:[^>]*)?>(?:[^<]*</ref>)?")
+# Matches both `<ref>body</ref>` (with possibly nested tags inside body) and
+# self-closing `<ref name='x' />`. The body uses `.*?` with re.DOTALL so
+# nested HTML/wikitext like <cite>...</cite> inside the ref is consumed
+# fully · the legacy `[^<]*` pattern dropped on the first nested `<`.
+_REF_TAG_RE = re.compile(r"<ref(?:[^>]*?)(?:/>|>.*?</ref>)", re.DOTALL)
 
 # `[N]` placeholders inserted by strip_references.
 _REF_PLACEHOLDER_RE = re.compile(r"\[(\d+)\]")
@@ -47,7 +50,7 @@ def strip_references(wikitext: str) -> tuple[str, dict[str, str]]:
     return _REF_TAG_RE.sub(_replace, wikitext), ref_map
 
 
-def restore_references(text: str, ref_map: dict[str, str]) -> str:
+def restore_references(text: str, ref_map: Mapping[str, str]) -> str:
     """Inverse of `strip_references`. Unknown placeholders pass through."""
 
     def _replace(match: re.Match[str]) -> str:

@@ -78,7 +78,7 @@ def _good_source_article(title: str = EN_TITLE) -> Article:
         wikitext=wikitext,
         wikitext_no_ref=wikitext_no_ref,
         ref_map=ref_map,
-        wikilinks=["Ego", "Self"],
+        wikilinks=("Ego", "Self"),
         dictionary={"Ego": "อีโก้", "Self": "ตัวตน"},
     )
 
@@ -90,7 +90,7 @@ def _short_source_article(title: str = EN_TITLE) -> Article:
         wikitext="too short",
         wikitext_no_ref="too short",
         ref_map={},
-        wikilinks=[],
+        wikilinks=(),
         dictionary={},
     )
 
@@ -134,7 +134,7 @@ async def test_happy_path_returns_draft_with_wikitext_and_review() -> None:
         wikitext="เนื้อหาเดิมในวิกิไทย",
         wikitext_no_ref="เนื้อหาเดิมในวิกิไทย",
         ref_map={},
-        wikilinks=[],
+        wikilinks=(),
         dictionary={},
     )
     storage = InMemoryDraftStorage()
@@ -277,7 +277,7 @@ async def test_image_quote_bullet_blocks_do_not_call_llm() -> None:
             wikitext=wikitext,
             wikitext_no_ref=wikitext,
             ref_map={},
-            wikilinks=[],
+            wikilinks=(),
             dictionary={},
         )
         llm = CountingLLM()
@@ -306,7 +306,7 @@ async def test_text_blocks_translated_in_serial_order() -> None:
         wikitext=wikitext,
         wikitext_no_ref=wikitext,
         ref_map={},
-        wikilinks=[],
+        wikilinks=(),
         dictionary={},
     )
     llm = CountingLLM()
@@ -350,7 +350,7 @@ async def test_dictionary_enrichment_translates_unknown_wikilinks_in_batch() -> 
         wikitext=wikitext,
         wikitext_no_ref=wikitext,
         ref_map={},
-        wikilinks=["Unknown1", "Unknown2"],
+        wikilinks=("Unknown1", "Unknown2"),
         dictionary={},
     )
     machine = CountingMachine()
@@ -394,7 +394,7 @@ async def test_category_blocks_pass_through_unchanged() -> None:
         wikitext=wikitext,
         wikitext_no_ref=wikitext,
         ref_map={},
-        wikilinks=[],
+        wikilinks=(),
         dictionary={},
     )
     uc = _make_use_case(
