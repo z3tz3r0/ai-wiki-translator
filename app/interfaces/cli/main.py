@@ -272,17 +272,16 @@ def refresh_rules(
     """Scrape th.wiki transliteration rule pages and write per-lang JSON cache."""
     from app.infrastructure.transliteration_rules import LANG_TO_TITLE
 
-    if lang is None and not all_langs:
-        typer.echo("error: pass --lang <code> or --all", err=True)
-        raise typer.Exit(code=2)
     if lang is not None and all_langs:
         typer.echo("error: --lang and --all are mutually exclusive", err=True)
         raise typer.Exit(code=2)
     if all_langs:
         langs: list[str] = sorted(LANG_TO_TITLE)
-    else:
-        assert lang is not None  # narrowed by the guards above
+    elif lang is not None:
         langs = [lang]
+    else:
+        typer.echo("error: pass --lang <code> or --all", err=True)
+        raise typer.Exit(code=2)
 
     try:
         use_case = bootstrap.build_refresh_rules_use_case(rules_dir=rules_dir)

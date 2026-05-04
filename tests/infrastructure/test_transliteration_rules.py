@@ -258,6 +258,41 @@ async def test_cache_write_creates_parent_dirs(tmp_path: Path) -> None:
     assert path.is_file()
 
 
+async def test_cache_write_cleans_tmp_on_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If the rename step raises, the tempfile must not leak."""
+
+    def boom(self: Path, target: Path) -> None:
+        raise OSError("simulated cross-device rename failure")
+
+    monkeypatch.setattr(Path, "replace", boom)
+    rs = _sample_ruleset()
+    with pytest.raises(OSError):
+        await write_cache(tmp_path, rs)
+    leftovers = list(tmp_path.glob("*.tmp"))  # noqa: ASYNC240 — test inspection
+    assert leftovers == []
+
+
+async def test_cache_read_lang_mismatch_returns_none(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """File named en.json with lang=de inside must be rejected · phase 2 safety."""
+    payload = {
+        "lang": "de",
+        "title": "wrong-lang-inside-en-file",
+        "url": "https://x",
+        "scraped_at": "2026-05-04T12:00:00",
+        "entries": [{"grapheme": "a", "thai": "เอ", "notes": ""}],
+        "excerpt": "",
+    }
+    (tmp_path / "en.json").write_text(json.dumps(payload), encoding="utf-8")
+    with caplog.at_level(logging.WARNING):
+        result = await read_cache(tmp_path, "en")
+    assert result is None
+    assert any("lang mismatch" in rec.message for rec in caplog.records)
+
+
 async def test_cache_write_overwrites_existing_atomically(tmp_path: Path) -> None:
     rs1 = _sample_ruleset()
     await write_cache(tmp_path, rs1)

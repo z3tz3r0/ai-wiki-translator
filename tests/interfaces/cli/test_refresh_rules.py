@@ -33,12 +33,8 @@ class _FakeUseCase:
         ]
 
 
-def test_missing_args_exits_nonzero(runner: CliRunner, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        cli_main.bootstrap,
-        "build_refresh_rules_use_case",
-        lambda **_: _FakeUseCase(),
-    )
+def test_missing_args_exits_nonzero(runner: CliRunner) -> None:
+    """Guard fires before bootstrap, so no monkeypatch needed."""
     result = runner.invoke(cli_main.refresh_rules_app, [])
     assert result.exit_code != 0
 

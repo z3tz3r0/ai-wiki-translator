@@ -23,6 +23,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from bs4 import BeautifulSoup, Tag
@@ -92,10 +93,15 @@ class WikipediaTransliterationRuleSource:
                 "page layout may have changed"
             )
         logger.info("parsed %d rule entries for %s (title=%r)", len(entries), lang, title)
+        # `quote` keeps `:` and `/` literal · the latter is intentional because
+        # th.wiki page titles use `/` as a logical separator (e.g.
+        # `วิกิพีเดีย:คู่มือการเขียน/การทับศัพท์...`) that browsers and the
+        # MediaWiki URL router both expect literal.
+        url = f"{RULE_HOST}/wiki/{quote(title, safe=':/')}"
         return LanguageRuleSet(
             lang=lang,
             title=title,
-            url=f"{RULE_HOST}/wiki/{title}",
+            url=url,
             scraped_at=datetime.datetime.now(datetime.UTC).replace(tzinfo=None),
             entries=tuple(entries),
             excerpt=excerpt,
@@ -205,11 +211,17 @@ async def read_cache(rules_dir: Path, lang: str) -> LanguageRuleSet | None:
 
 
 async def write_cache(rules_dir: Path, ruleset: LanguageRuleSet) -> Path:
-    """Atomically write a ``LanguageRuleSet`` to ``<rules_dir>/<lang>.json``.
+    """Write a ``LanguageRuleSet`` to ``<rules_dir>/<lang>.json``.
 
-    Atomic via tempfile in the same directory + ``Path.replace()`` (POSIX
-    rename semantics). A crash mid-write leaves a ``*.tmp`` next to the
-    final path · the next successful run overwrites both.
+    Atomic with respect to readers · uses a tempfile in the same directory +
+    ``Path.replace()`` (POSIX rename semantics) so concurrent readers always
+    see either the prior version or the new version, never a partial file.
+    NOT crash-durable · without ``fsync``, a kernel crash between rename and
+    writeback can lose the new file. Acceptable for a refresh-on-demand
+    cache · the next ``wiki-refresh-rules`` invocation rebuilds it.
+
+    Cleans up the tempfile on any exception (``OSError``, ``json`` errors,
+    cross-device rename) so failed writes don't leak ``*.tmp`` files.
     """
     return await asyncio.to_thread(_write_sync, rules_dir, ruleset)
 
@@ -223,22 +235,39 @@ def _read_sync(rules_dir: Path, lang: str) -> LanguageRuleSet | None:
     except (OSError, json.JSONDecodeError) as exc:
         logger.warning("cache read failed for %s: %s · returning None", path, exc)
         return None
-    return _from_dict(payload)
+    result = _from_dict(payload)
+    if result is not None and result.lang != lang:
+        # Filename and payload disagree · refuse to return a mis-keyed
+        # ruleset that downstream code would apply to the wrong language.
+        logger.warning(
+            "cache lang mismatch: file %s contains lang=%r, expected %r · returning None",
+            path,
+            result.lang,
+            lang,
+        )
+        return None
+    return result
 
 
 def _write_sync(rules_dir: Path, ruleset: LanguageRuleSet) -> Path:
     rules_dir.mkdir(parents=True, exist_ok=True)
     final = rules_dir / f"{ruleset.lang}.json"
-    with tempfile.NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        dir=rules_dir,
-        delete=False,
-        suffix=".tmp",
-    ) as tmp:
-        json.dump(_to_dict(ruleset), tmp, ensure_ascii=False, indent=2)
-        tmp_path = Path(tmp.name)
-    tmp_path.replace(final)  # atomic on POSIX same-fs
+    tmp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=rules_dir,
+            delete=False,
+            suffix=".tmp",
+        ) as tmp:
+            json.dump(_to_dict(ruleset), tmp, ensure_ascii=False, indent=2)
+            tmp_path = Path(tmp.name)
+        tmp_path.replace(final)  # atomic on POSIX same-fs
+    except BaseException:
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
+        raise
     return final
 
 
