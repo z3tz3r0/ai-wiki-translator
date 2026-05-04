@@ -34,7 +34,7 @@ def _make_article(title: str = "Foo") -> Article:
         wikitext="body",
         wikitext_no_ref="body",
         ref_map={},
-        wikilinks=[],
+        wikilinks=(),
         dictionary={},
     )
 

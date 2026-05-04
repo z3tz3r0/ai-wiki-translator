@@ -128,7 +128,7 @@ def _good_article(title: str) -> Article:
             "[2]": "<ref>r2</ref>",
             "[3]": "<ref>r3</ref>",
         },
-        wikilinks=[],
+        wikilinks=(),
         dictionary={},
     )
 

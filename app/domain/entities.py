@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from app.domain.values import (
     ArticleTitle,
@@ -44,10 +46,13 @@ class Article:
     title: ArticleTitle
     wikitext: str
     wikitext_no_ref: str
-    ref_map: dict[str, str]
-    wikilinks: list[str]
+    ref_map: Mapping[str, str]
+    wikilinks: tuple[str, ...]
     dictionary: Dictionary
 
     def __post_init__(self) -> None:
         if not self.title:
             raise ValueError("title must not be empty")
+        object.__setattr__(self, "ref_map", MappingProxyType(dict(self.ref_map)))
+        object.__setattr__(self, "wikilinks", tuple(self.wikilinks))
+        object.__setattr__(self, "dictionary", MappingProxyType(dict(self.dictionary)))

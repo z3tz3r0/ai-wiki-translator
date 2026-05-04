@@ -79,3 +79,25 @@ def test_replace_with_dictionary_pipe_display_equals_link() -> None:
     """When display duplicates the link, both sides translate together."""
     out = replace_with_dictionary("[[Python|Python]]", {"Python": "ไพธอน"}, str.upper)
     assert out == "[[ไพธอน|ไพธอน]]"
+
+
+def test_parse_glossary_lines_skips_empty_term() -> None:
+    """`:value` and `   :value` should not produce an empty-string key."""
+    assert parse_glossary_lines([":value", "   :value", "real:term"]) == {"real": "term"}
+
+
+def test_replace_blockquote_variant() -> None:
+    """`{{blockquote|...}}` is supported alongside `{{quote|...}}`."""
+    out = replace_quote("{{blockquote|Hello world}}", {}, str.upper)
+    assert out == "{{blockquote|HELLO WORLD}}"
+
+
+def test_replace_image_does_not_corrupt_duplicate_text() -> None:
+    """Regression for `str.replace` bug: only the matched span should change.
+
+    The caption text "dog" appears both inside and outside the image block;
+    the legacy `text.replace(description, translated)` would replace both.
+    """
+    text = "dog [[File:X.jpg|thumb|dog]]\nA dog runs."
+    out = replace_image_description(text, {}, str.upper)
+    assert out == "dog [[ไฟล์:X.jpg|thumb|DOG]]\nA dog runs."

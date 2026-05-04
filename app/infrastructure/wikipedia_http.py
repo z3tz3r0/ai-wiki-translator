@@ -103,7 +103,7 @@ class WikipediaHttpReader:
         return httpx.AsyncClient(**kwargs)
 
 
-def _extract_wikilinks(wikitext: str) -> list[str]:
+def _extract_wikilinks(wikitext: str) -> tuple[str, ...]:
     """Return wikilink targets in source order, deduplicated.
 
     Skips ``File:`` and ``Category:`` prefixes. Display text after ``|`` is
@@ -117,4 +117,4 @@ def _extract_wikilinks(wikitext: str) -> list[str]:
             continue
         seen.add(target)
         out.append(target)
-    return out
+    return tuple(out)
