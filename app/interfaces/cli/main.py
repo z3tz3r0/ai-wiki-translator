@@ -54,6 +54,7 @@ _DEFAULT_QUEUE_PATH: Path = Path.home() / ".config" / "wiki-translator" / "queue
 translate_app = typer.Typer(add_completion=False, no_args_is_help=True)
 translate_queue_app = typer.Typer(add_completion=False)
 list_drafts_app = typer.Typer(add_completion=False)
+refresh_rules_app = typer.Typer(add_completion=False, no_args_is_help=True)
 
 
 def _format_draft_summary(draft: Draft) -> str:
@@ -247,3 +248,56 @@ def list_drafts(
         return
     for draft in drafts:
         typer.echo(f"{draft.when.isoformat()}  {draft.slug}  {draft.dir}")
+
+
+@refresh_rules_app.command()
+def refresh_rules(
+    lang: Annotated[
+        str | None,
+        typer.Option("--lang", help="ISO code of one language to refresh (e.g. 'en')."),
+    ] = None,
+    all_langs: Annotated[
+        bool,
+        typer.Option("--all", help="Refresh every supported language."),
+    ] = False,
+    rules_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--rules-dir",
+            help="Override cache directory (default: ~/.cache/wiki-translator/rules).",
+            file_okay=False,
+        ),
+    ] = None,
+) -> None:
+    """Scrape th.wiki transliteration rule pages and write per-lang JSON cache."""
+    from app.infrastructure.transliteration_rules import LANG_TO_TITLE
+
+    if lang is None and not all_langs:
+        typer.echo("error: pass --lang <code> or --all", err=True)
+        raise typer.Exit(code=2)
+    if lang is not None and all_langs:
+        typer.echo("error: --lang and --all are mutually exclusive", err=True)
+        raise typer.Exit(code=2)
+    if all_langs:
+        langs: list[str] = sorted(LANG_TO_TITLE)
+    else:
+        assert lang is not None  # narrowed by the guards above
+        langs = [lang]
+
+    try:
+        use_case = bootstrap.build_refresh_rules_use_case(rules_dir=rules_dir)
+        results = asyncio.run(use_case.execute(langs))
+    except Exception as exc:
+        typer.echo(f"error: {exc}", err=True)
+        _notify_completion("wiki-refresh-rules failed", str(exc))
+        raise typer.Exit(code=1) from exc
+
+    ok = sum(1 for r in results if r.ok)
+    bad = len(results) - ok
+    for r in results:
+        status = "ok" if r.ok else "FAIL"
+        target = str(r.path) if r.path else r.error or "?"
+        typer.echo(f"{status} · {r.lang} · {target}")
+    summary = f"{ok} ok · {bad} failed"
+    typer.echo(f"done · {summary}")
+    _notify_completion("wiki-refresh-rules done", summary)

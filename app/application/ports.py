@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from app.application.dto import DraftMetadata
+from app.application.dto import DraftMetadata, LanguageRuleSet
 from app.domain.entities import Article
 from app.domain.values import Glossary
 
@@ -81,3 +81,16 @@ class DraftStorage(Protocol):
     ) -> Path: ...
 
     async def list_drafts(self, since: datetime | None = None) -> list[DraftMetadata]: ...
+
+
+@runtime_checkable
+class TransliterationRuleSource(Protocol):
+    """Fetches th.wiki transliteration rule pages for one source language.
+
+    Adapters parse the live MediaWiki HTML response and return a structured
+    ``LanguageRuleSet``. The CLI command ``wiki-refresh-rules`` invokes this
+    port and persists the result to a JSON cache. Phase 3's validator reads
+    the cache directly · this port is fetch-only (no persistence semantics).
+    """
+
+    async def fetch(self, lang: str) -> LanguageRuleSet: ...

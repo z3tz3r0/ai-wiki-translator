@@ -66,3 +66,38 @@ class TranslateArticleCommand:
     source_lang_override: str | None = None
     glossary_path: str | None = None
     output_dir: Path | None = None
+
+
+@dataclass(frozen=True)
+class RuleEntry:
+    """One grapheme · its Thai transliteration · optional notes.
+
+    Source-language graphemes (English digraphs, French liaisons, etc.)
+    paired with the Thai script the th.wiki rule prescribes. ``notes`` is
+    free-form Thai prose (context, examples, exceptions) lifted from the
+    rule-page table cell when present.
+    """
+
+    grapheme: str
+    thai: str
+    notes: str = ""
+
+
+@dataclass(frozen=True)
+class LanguageRuleSet:
+    """Cached th.wiki transliteration rules for one source language.
+
+    Phase 1 writes one of these to ``~/.cache/wiki-translator/rules/<lang>.json``
+    after scraping. Phase 2's validator reads it back at translation time.
+    The ``excerpt`` is a markdown rendering of the rule page suitable for
+    pasting into an LLM-judge prompt; ``entries`` is the structured form
+    for direct lookup. ``scraped_at`` is naive UTC, matching the
+    ``_utcnow_naive`` convention used elsewhere in the codebase.
+    """
+
+    lang: str
+    title: str
+    url: str
+    scraped_at: datetime.datetime
+    entries: tuple[RuleEntry, ...]
+    excerpt: str

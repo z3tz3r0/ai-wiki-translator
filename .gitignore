@@ -23,3 +23,5 @@ frontend/dist/
 .code-review-graph/
 # Autoresearch optimization scaffold (its own nested git repo)
 autoresearch/
+# Claude Code session-runtime state
+.claude/*.lock

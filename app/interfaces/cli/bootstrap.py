@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 
 from app.application.use_cases.list_drafts import ListDraftsUseCase
+from app.application.use_cases.refresh_rules import RefreshRulesUseCase
 from app.application.use_cases.translate_article import TranslateArticleUseCase
 from app.infrastructure.file_glossary_repo import FileGlossaryRepository
 from app.infrastructure.file_prompt_repo import FilePromptRepository
@@ -101,3 +102,29 @@ def build_translate_use_case(*, output_dir: Path | None = None) -> TranslateArti
 def build_list_drafts_use_case(*, output_dir: Path | None = None) -> ListDraftsUseCase:
     """Wire `ListDraftsUseCase` with the on-disk draft store."""
     return ListDraftsUseCase(storage=MarkdownDraftStorage(base_dir=_resolve_output_dir(output_dir)))
+
+
+def _resolve_rules_dir(override: Path | None) -> Path:
+    if override is not None:
+        return override
+    env = os.environ.get("WIKI_TRANSLATOR_RULES_DIR")
+    if env:
+        return Path(env)
+    from app.infrastructure.transliteration_rules import default_rules_dir
+
+    return default_rules_dir()
+
+
+def build_refresh_rules_use_case(*, rules_dir: Path | None = None) -> RefreshRulesUseCase:
+    """Wire `RefreshRulesUseCase` with the live th.wiki adapter.
+
+    Network-only · no Gemini key needed. Heavy adapter import (BS4 + lxml)
+    is deferred to call time so ``--help`` stays fast.
+    """
+    from app.infrastructure.transliteration_rules import WikipediaTransliterationRuleSource
+
+    user_agent = os.environ.get("WIKI_TRANSLATOR_USER_AGENT", DEFAULT_USER_AGENT)
+    return RefreshRulesUseCase(
+        source=WikipediaTransliterationRuleSource(user_agent=user_agent),
+        rules_dir=_resolve_rules_dir(rules_dir),
+    )

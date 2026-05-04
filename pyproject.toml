@@ -3,9 +3,11 @@ name = "ai-wiki-translator"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
+    "beautifulsoup4>=4.12.3",
     "fastapi>=0.136.1",
     "google-genai>=1.74.0",
     "httpx>=0.28.1",
+    "lxml>=5.3.0",
     "pydantic-settings>=2.14.0",
     "python-dotenv>=1.2.2",
     "typer>=0.25.1",
@@ -15,6 +17,7 @@ dependencies = [
 wiki-translate = "app.interfaces.cli.main:translate_app"
 wiki-translate-queue = "app.interfaces.cli.main:translate_queue_app"
 wiki-list-drafts = "app.interfaces.cli.main:list_drafts_app"
+wiki-refresh-rules = "app.interfaces.cli.main:refresh_rules_app"
 
 [dependency-groups]
 dev = [
