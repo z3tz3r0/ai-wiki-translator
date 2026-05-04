@@ -12,6 +12,9 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import logging
+import os
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -23,6 +26,26 @@ from app.application.use_cases.run_queued import parse_queue_toml
 from app.interfaces.cli import bootstrap as bootstrap
 
 load_dotenv()
+
+
+def _configure_logging() -> None:
+    """Send INFO+ to stderr with a compact format.
+
+    Set ``WIKI_TRANSLATOR_LOG_LEVEL=DEBUG`` (or any standard logging level)
+    to override. Idempotent · re-running has no effect once a handler is set.
+    """
+    root = logging.getLogger()
+    if root.handlers:
+        return
+    level_name = os.environ.get("WIKI_TRANSLATOR_LOG_LEVEL", "INFO").upper()
+    level = getattr(logging, level_name, logging.INFO)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s · %(message)s"))
+    root.addHandler(handler)
+    root.setLevel(level)
+
+
+_configure_logging()
 
 _DEFAULT_QUEUE_PATH: Path = Path.home() / ".config" / "wiki-translator" / "queue.toml"
 

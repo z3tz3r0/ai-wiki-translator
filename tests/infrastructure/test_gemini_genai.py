@@ -131,7 +131,7 @@ async def test_translate_section_retries_once_on_429() -> None:
 
 
 async def test_translate_section_does_not_retry_non_429_errors() -> None:
-    """Non-429 exceptions raise immediately without retrying."""
+    """Non-retriable exceptions raise immediately without retrying."""
     calls: list[int] = []
 
     async def boom(*, model: str, contents: Any, config: Any) -> SimpleNamespace:
@@ -143,6 +143,43 @@ async def test_translate_section_does_not_retry_non_429_errors() -> None:
     with pytest.raises(RuntimeError, match="non-rate-limit"):
         await adapter.translate_section("body", "sys")
     assert len(calls) == 1
+
+
+async def test_translate_section_retries_once_on_503() -> None:
+    """A 503 with `code` attribute triggers one retry · second attempt succeeds."""
+    calls: list[int] = []
+
+    class Unavailable(Exception):
+        code: ClassVar[int] = 503
+
+    async def flaky(*, model: str, contents: Any, config: Any) -> SimpleNamespace:
+        calls.append(1)
+        if len(calls) == 1:
+            raise Unavailable("model overloaded")
+        return SimpleNamespace(text="recovered")
+
+    client = SimpleNamespace(aio=SimpleNamespace(models=SimpleNamespace(generate_content=flaky)))
+    adapter = GeminiAssistantAdapter(clients=[client])
+    out = await adapter.translate_section("body", "sys")
+    assert out == "recovered"
+    assert len(calls) == 2
+
+
+async def test_translate_section_reraises_503_after_retries_exhausted() -> None:
+    """If every attempt hits 503, the last exception is propagated."""
+
+    class Unavailable(Exception):
+        code: ClassVar[int] = 503
+
+    async def always_503(*, model: str, contents: Any, config: Any) -> SimpleNamespace:
+        raise Unavailable("model overloaded")
+
+    client = SimpleNamespace(
+        aio=SimpleNamespace(models=SimpleNamespace(generate_content=always_503))
+    )
+    adapter = GeminiAssistantAdapter(clients=[client], max_retries=1)
+    with pytest.raises(Unavailable):
+        await adapter.translate_section("body", "sys")
 
 
 async def test_translate_section_reraises_after_retries_exhausted() -> None:
@@ -281,6 +318,20 @@ def test_retry_delay_seconds_falls_back_to_60_when_missing() -> None:
         details = "not a list"
 
     assert _retry_delay_seconds(WithMalformed()) == 60.0
+
+
+def test_retry_delay_seconds_uses_exponential_backoff_for_503() -> None:
+    """503 has no server-supplied delay · use 2^attempt capped at 30s."""
+
+    class Unavailable(Exception):
+        code: ClassVar[int] = 503
+
+    exc = Unavailable()
+    assert _retry_delay_seconds(exc, attempt=0) == 1.0
+    assert _retry_delay_seconds(exc, attempt=1) == 2.0
+    assert _retry_delay_seconds(exc, attempt=2) == 4.0
+    # Cap kicks in
+    assert _retry_delay_seconds(exc, attempt=10) == 30.0
 
 
 # --- integration -----------------------------------------------------------

@@ -17,6 +17,7 @@ Pipeline:
 from __future__ import annotations
 
 import dataclasses
+import logging
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -52,6 +53,8 @@ from app.domain.text_transforms import (
     replace_with_dictionary,
 )
 from app.domain.values import Dictionary, SectionType
+
+logger = logging.getLogger(__name__)
 
 
 def _utcnow_naive() -> datetime:
@@ -111,26 +114,31 @@ class TranslateArticleUseCase:
 
     async def execute(self, cmd: TranslateArticleCommand) -> Draft:
         slug = _slugify(cmd.title)
+        logger.info("translating %r (slug=%s, target=%s)", cmd.title, slug, self.target_lang)
 
         th_article = await self.wikipedia.fetch_article(cmd.title, self.target_lang)
         current_th_wikitext = th_article.wikitext if th_article else ""
 
         langlinks = await self.wikipedia.fetch_langlinks(cmd.title, self.target_lang)
+        logger.info("found %d langlinks for %r", len(langlinks), cmd.title)
 
         try:
             source_lang, source_score = await self._pick_source(cmd, langlinks)
         except ValueError as exc:
+            logger.warning("source pick failed: %s", exc)
             return await self._save_rejection(
                 slug=slug,
                 source_lang="",
                 source_score=_placeholder_score(""),
                 validation=ValidationResult(passed=False, reasons=(str(exc),)),
             )
+        logger.info("picked source=%s via %s", source_lang, source_score.winning_signal)
 
         source_title = langlinks.get(source_lang, cmd.title)
         source_article = await self.wikipedia.fetch_article(source_title, source_lang)
         if source_article is None:
             reason = f"source article {source_title!r} not found in {source_lang!r}"
+            logger.warning(reason)
             return await self._save_rejection(
                 slug=slug,
                 source_lang=source_lang,
@@ -143,19 +151,27 @@ class TranslateArticleUseCase:
             word_count=len(source_article.wikitext_no_ref.split()),
             ref_count=len(source_article.ref_map),
         )
+        logger.info(
+            "source loaded: words=%d refs=%d",
+            source_score.word_count,
+            source_score.ref_count,
+        )
 
         validation = is_acceptable_source(source_article, self.quality_gate)
         if not validation.passed:
+            logger.warning("quality gate rejected source: %s", "; ".join(validation.reasons))
             return await self._save_rejection(
                 slug=slug,
                 source_lang=source_lang,
                 source_score=source_score,
                 validation=validation,
             )
+        logger.info("quality gate passed")
 
         glossary = await self.glossary_repo.load(cmd.glossary_path)
         system_instruction = await self.prompt_repo.load(self.prompt_template_id)
         dictionary = merge_dictionaries(glossary, source_article.dictionary)
+        logger.info("loaded glossary=%d terms, dictionary=%d terms", len(glossary), len(dictionary))
 
         proposed = await self._translate_article(
             source_article=source_article,
@@ -227,6 +243,10 @@ class TranslateArticleUseCase:
     ) -> str:
         unknown_links = [w for w in source_article.wikilinks if w not in base_dictionary]
         if unknown_links:
+            logger.info(
+                "translating %d unknown wikilinks via machine translator",
+                len(unknown_links),
+            )
             translations = await self.machine.translate_batch(
                 unknown_links, source_lang, self.target_lang
             )
@@ -239,9 +259,12 @@ class TranslateArticleUseCase:
             return base_dictionary.get(text, text)
 
         blocks = split_into_blocks(source_article.wikitext_no_ref)
+        total = len(blocks)
+        logger.info("split into %d sections", total)
         translated: list[str] = []
-        for block in blocks:
+        for index, block in enumerate(blocks, start=1):
             section_type = classify_section(block, source_article.dictionary)
+            logger.info("[%d/%d] type=%s", index, total, section_type.name)
             if section_type in _PASSTHROUGH_TYPES:
                 translated.append(block)
             elif section_type is SectionType.IMAGE:
@@ -255,6 +278,7 @@ class TranslateArticleUseCase:
                 translated.append(await self.llm.translate_section(with_dict, system_instruction))
 
         joined = "\n\n".join(translated)
+        logger.info("all sections translated; restoring %d refs", len(source_article.ref_map))
         return restore_references(joined, source_article.ref_map)
 
     async def _save_rejection(
