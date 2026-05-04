@@ -14,6 +14,8 @@ import asyncio
 import datetime
 import logging
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Annotated
@@ -69,6 +71,34 @@ def _print_draft(draft: Draft) -> None:
             typer.echo(f"  - {reason}")
 
 
+def _notify_completion(title: str, body: str) -> None:
+    """Fire a desktop notification at end of run · best effort, never raises.
+
+    Uses ``notify-send`` (libnotify-bin) on Linux desktops. No-ops silently
+    when the binary isn't on PATH or when the spawn fails for any reason
+    (e.g. headless server, missing DBus session). Disable with
+    ``WIKI_TRANSLATOR_NO_NOTIFY=1``.
+    """
+    if os.environ.get("WIKI_TRANSLATOR_NO_NOTIFY"):
+        return
+    if not shutil.which("notify-send"):
+        return
+    try:
+        subprocess.Popen(  # noqa: S603 — fixed argv, no shell
+            [
+                "notify-send",
+                "--app-name=wiki-translator",
+                "--icon=dialog-information",
+                title,
+                body,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+
 @translate_app.command()
 def translate(
     title: Annotated[
@@ -112,8 +142,10 @@ def translate(
         draft = asyncio.run(use_case.execute(cmd))
     except Exception as exc:
         typer.echo(f"error: {exc}", err=True)
+        _notify_completion("wiki-translate failed", str(exc))
         raise typer.Exit(code=1) from exc
     _print_draft(draft)
+    _notify_completion("wiki-translate done", _format_draft_summary(draft))
 
 
 @translate_queue_app.command()
@@ -152,14 +184,27 @@ def translate_queue(
         use_case = bootstrap.build_translate_use_case(output_dir=output_dir)
     except Exception as exc:
         typer.echo(f"error: {exc}", err=True)
+        _notify_completion("wiki-translate-queue failed", str(exc))
         raise typer.Exit(code=1) from exc
+    passed = 0
+    rejected = 0
+    errored = 0
     for cmd in commands:
         try:
             draft = asyncio.run(use_case.execute(cmd))
         except Exception as exc:
             typer.echo(f"error processing {cmd.title!r}: {exc}", err=True)
+            errored += 1
             continue
+        if draft.validation.passed:
+            passed += 1
+        else:
+            rejected += 1
         _print_draft(draft)
+    body = (
+        f"{len(commands)} entries · {passed} passed · {rejected} rejected · {errored} errored"
+    )
+    _notify_completion("wiki-translate-queue done", body)
 
 
 @list_drafts_app.command()
