@@ -176,7 +176,7 @@ The codebase already has the patterns we need. `summarize_diff` is the exact ana
 | # | Phase | Description | Status | Parallel | Depends | PRP Plan |
 |---|-------|-------------|--------|----------|---------|----------|
 | 1 | Rule scraper foundation | `WikipediaTransliterationRuleSource` port + adapter, `wiki-refresh-rules` CLI, BS4 parser, JSON cache writer, tests with `httpx.MockTransport` | complete | with 2 | - | [plan](../plans/completed/transliteration-rule-scraper-foundation.plan.md) · [report](../reports/transliteration-rule-scraper-foundation-report.md) |
-| 2 | Validator + detection skeleton | `TransliterationValidator` port + LiteValidatorAdapter, candidate detection regex, `transliteration_gate.py` service, DTOs, unit tests with fakes | pending | with 1 | - | - |
+| 2 | Validator + detection skeleton | `TransliterationValidator` port + LiteValidatorAdapter, candidate detection regex, `transliteration_gate.py` service, DTOs, unit tests with fakes | complete | with 1 | - | [plan](../plans/completed/transliteration-validator-detection.plan.md) |
 | 3 | Integration into use case + review.md | Hook gate into `TranslateArticleUseCase.execute()`, update `_render_review_md()`, integration test against fakes, e2e smoke against ภาษาซีชาร์ป | pending | - | 1, 2 | - |
 | 4 | Eval harness + corpus | Wannaphong dict loader + spot-check 20 entries against live th.wiki rules, FP-first measurement script, baseline metrics report; hand-build supplemental corpus only if Phase 3 surfaces misclassifications worth labeling | pending | - | 3 | - |
 | 5 | Cached opt-in adapter | `CachedValidatorAdapter` for Gemini 3 Flash Preview, `caches.create` lazy logic, env var routing in bootstrap, free-tier RPM/TPM verification | pending | - | 3 | - |
