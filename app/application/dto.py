@@ -101,3 +101,55 @@ class LanguageRuleSet:
     scraped_at: datetime.datetime
     entries: tuple[RuleEntry, ...]
     excerpt: str
+
+
+@dataclass(frozen=True)
+class TransliterationCandidate:
+    """One Thai-script transliteration candidate identified by the detector.
+
+    The detector emits these from the proposed wikitext. ``thai`` is the
+    contiguous Thai-script span (whitespace allowed); ``context`` is a
+    short surrounding wikitext snippet used by the LLM judge to
+    disambiguate (e.g. distinguish a place name from a person's name).
+    ``latin_hint`` is the Latin-script source name when the detector can
+    extract it (e.g. from a wikilink target or a parenthetical disclosure).
+    """
+
+    thai: str
+    context: str
+    latin_hint: str | None = None
+
+
+@dataclass(frozen=True)
+class TransliterationVerdict:
+    """Per-candidate verdict from a `TransliterationValidator`.
+
+    ``status`` is one of ``approved`` (matches th.wiki rules),
+    ``flagged`` (clear rule violation, ``suggested`` should be set to
+    the corrected Thai), or ``uncertain`` (validator could not decide,
+    e.g. the LLM judge returned malformed JSON or no rule covers this
+    grapheme).
+    """
+
+    candidate: TransliterationCandidate
+    status: Literal["approved", "flagged", "uncertain"]
+    rule_citation: str = ""
+    suggested: str = ""
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class TransliterationReport:
+    """Aggregate report from one `evaluate_transliterations` run.
+
+    ``status`` distinguishes a successful gate run (``ok``, even with
+    zero candidates) from a soft-degrade (``skipped``, e.g. rules cache
+    missing). When ``skipped``, ``skipped_reason`` carries the loud
+    banner the user sees in review.md (Phase 3).
+    """
+
+    source_lang: str
+    candidates_found: int
+    verdicts: tuple[TransliterationVerdict, ...]
+    status: Literal["ok", "skipped"]
+    skipped_reason: str = ""

@@ -16,6 +16,7 @@ from app.application.ports import (
     LLMTranslator,
     MachineTranslator,
     PromptTemplateRepository,
+    TransliterationValidator,
     WikidataReader,
     WikipediaReader,
 )
@@ -24,6 +25,7 @@ from app.domain.values import ArticleTitle
 from tests.fakes.repos import FakeGlossaryRepo, FakePromptRepo
 from tests.fakes.storage import InMemoryDraftStorage
 from tests.fakes.translators import FakeLLMTranslator, FakeMachineTranslator
+from tests.fakes.validator import FakeTransliterationValidator
 from tests.fakes.wikidata import FakeWikidataReader
 from tests.fakes.wikipedia import FakeWikipediaReader
 
@@ -167,6 +169,7 @@ def test_fakes_satisfy_protocols() -> None:
     assert isinstance(FakePromptRepo(), PromptTemplateRepository)
     assert isinstance(FakeGlossaryRepo(), GlossaryRepository)
     assert isinstance(InMemoryDraftStorage(), DraftStorage)
+    assert isinstance(FakeTransliterationValidator(), TransliterationValidator)
 
 
 # --- DTO immutability ------------------------------------------------------

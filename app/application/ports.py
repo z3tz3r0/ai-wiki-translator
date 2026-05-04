@@ -6,7 +6,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from app.application.dto import DraftMetadata, LanguageRuleSet
+from app.application.dto import (
+    DraftMetadata,
+    LanguageRuleSet,
+    TransliterationCandidate,
+    TransliterationVerdict,
+)
 from app.domain.entities import Article
 from app.domain.values import Glossary
 
@@ -94,3 +99,25 @@ class TransliterationRuleSource(Protocol):
     """
 
     async def fetch(self, lang: str) -> LanguageRuleSet: ...
+
+
+@runtime_checkable
+class TransliterationValidator(Protocol):
+    """Judges whether each Thai-script candidate matches th.wiki rules.
+
+    Adapters take a tuple of candidates plus the cached rule set for
+    the source language and return one verdict per candidate, in the
+    same order. Implementations SHOULD batch all candidates into a
+    single call (free-tier compatible) but the contract does not
+    enforce this · the orchestrator never inspects call count.
+
+    The verdict tuple length MUST equal ``len(candidates)``. Adapters
+    that lose candidates due to LLM truncation or parse failure must
+    pad with ``uncertain`` verdicts so order is preserved.
+    """
+
+    async def validate(
+        self,
+        candidates: tuple[TransliterationCandidate, ...],
+        rules: LanguageRuleSet,
+    ) -> tuple[TransliterationVerdict, ...]: ...
