@@ -14,11 +14,7 @@ from typing import Any
 
 from google.genai import types
 
-from app.infrastructure.gemini_key_pool import GeminiKeyPool, resolve_pool
-
-# Google's alias · moves to each new Flash-Lite release (2 weeks' notice by
-# email). Override with WIKI_TRANSLATOR_GEMINI_MODEL to pin a version.
-DEFAULT_GEMINI_MODEL = "gemini-flash-lite-latest"
+from app.infrastructure.gemini_key_pool import DEFAULT_GEMINI_MODEL, GeminiKeyPool, resolve_pool
 
 
 @dataclass
@@ -26,13 +22,14 @@ class GeminiAssistantAdapter:
     """`LLMTranslator` Protocol implementation backed by Google Gemini.
 
     Pass a shared ``pool``, or ``clients`` (one ``genai.Client`` per key) to
-    build a private pool with ``requests_per_minute`` and ``max_retries``.
+    build a private pool. ``requests_per_minute`` and ``max_retries`` apply
+    only to a private pool (None means the pool default).
     """
 
     clients: list[Any] = field(default_factory=list)
     model: str = DEFAULT_GEMINI_MODEL
-    requests_per_minute: int = 12
-    max_retries: int = 1
+    requests_per_minute: int | None = None
+    max_retries: int | None = None
     pool: GeminiKeyPool | None = None
     _pool: GeminiKeyPool = field(init=False, repr=False)
 

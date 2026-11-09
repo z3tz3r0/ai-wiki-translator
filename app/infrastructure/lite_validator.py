@@ -32,8 +32,12 @@ from app.application.dto import (
     TransliterationCandidate,
     TransliterationVerdict,
 )
-from app.infrastructure.gemini_genai import DEFAULT_GEMINI_MODEL
-from app.infrastructure.gemini_key_pool import GeminiKeyPool, is_quota_exhaustion, resolve_pool
+from app.infrastructure.gemini_key_pool import (
+    DEFAULT_GEMINI_MODEL,
+    GeminiKeyPool,
+    is_quota_exhaustion,
+    resolve_pool,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +51,15 @@ class LiteValidatorAdapter:
     Construct with the system-instruction template (loaded from
     ``app/prompts/transliteration_judge.md``) plus a shared ``pool``, or
     ``clients`` (one ``genai.Client`` per key) to build a private pool.
+    ``requests_per_minute`` and ``max_retries`` apply only to a private pool
+    (None means the pool default).
     """
 
     clients: list[Any] = field(default_factory=list)
     judge_template: str = ""
     model: str = DEFAULT_GEMINI_MODEL
-    requests_per_minute: int = 12
-    max_retries: int = 1
+    requests_per_minute: int | None = None
+    max_retries: int | None = None
     pool: GeminiKeyPool | None = None
     _pool: GeminiKeyPool = field(init=False, repr=False)
 

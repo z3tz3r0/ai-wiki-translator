@@ -20,8 +20,8 @@ from app.application.use_cases.refresh_rules import RefreshRulesUseCase
 from app.application.use_cases.translate_article import TranslateArticleUseCase
 from app.infrastructure.file_glossary_repo import FileGlossaryRepository
 from app.infrastructure.file_prompt_repo import FilePromptRepository
-from app.infrastructure.gemini_genai import DEFAULT_GEMINI_MODEL, GeminiAssistantAdapter
-from app.infrastructure.gemini_key_pool import GeminiKeyPool
+from app.infrastructure.gemini_genai import GeminiAssistantAdapter
+from app.infrastructure.gemini_key_pool import DEFAULT_GEMINI_MODEL, GeminiKeyPool
 from app.infrastructure.markdown_draft_storage import MarkdownDraftStorage
 from app.infrastructure.self_consistent_llm import SelfConsistentLLMTranslator
 from app.infrastructure.wikidata_http import WikidataHttpReader

@@ -188,8 +188,9 @@ Multi-key Gemini rotation: when you set `GEMINI_API_KEYS=k1,k2,k3`,
 with a client per key. Each call claims the key that frees up first, so
 parallel samples spread across keys. A per-minute 429 rests that key for
 Google's `retryDelay`, a per-day 429 rests it until midnight Pacific, and an
-invalid or forbidden key is dropped for the run. Logs name keys by their
-position in `GEMINI_API_KEYS` (`key #2`), never by value.
+invalid or forbidden key is dropped for the run. A 503 (model overloaded)
+backs off before any key retries. Logs name keys by their position among the
+non-empty entries of `GEMINI_API_KEYS` (`key #2`), never by value.
 
 Self-consistency sampling: each TEXT section is translated N times in
 parallel (default 3) and the candidate with best structural fidelity wins

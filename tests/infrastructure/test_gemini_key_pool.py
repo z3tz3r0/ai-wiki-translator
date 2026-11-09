@@ -19,9 +19,11 @@ import pytest
 from google.genai import errors
 
 from app.application.dto import LanguageRuleSet, TransliterationCandidate
-from app.infrastructure.gemini_genai import DEFAULT_GEMINI_MODEL, GeminiAssistantAdapter
+from app.infrastructure.gemini_genai import GeminiAssistantAdapter
 from app.infrastructure.gemini_key_pool import (
+    DEFAULT_GEMINI_MODEL,
     GeminiKeyPool,
+    KeyPoolExhaustedError,
     retry_delay_seconds,
     seconds_until_pacific_midnight,
 )
@@ -79,6 +81,10 @@ def forbidden() -> errors.APIError:
 
 def bad_request() -> errors.APIError:
     return _error(400, "INVALID_ARGUMENT")
+
+
+def overloaded() -> errors.APIError:
+    return _error(503, "UNAVAILABLE")
 
 
 # --- fakes -------------------------------------------------------------------
@@ -284,7 +290,7 @@ def _rules() -> LanguageRuleSet:
     )
 
 
-async def test_adapters_share_one_pool_and_default_to_pinned_model() -> None:
+async def test_adapters_share_one_pool_and_default_to_alias_model() -> None:
     log: list[str] = []
     ft = FakeTime()
     pool = GeminiKeyPool(
@@ -330,3 +336,164 @@ def test_adapter_rejects_both_clients_and_pool() -> None:
     pool = GeminiKeyPool(clients=[object()])
     with pytest.raises(ValueError, match="not both"):
         GeminiAssistantAdapter(clients=[object()], pool=pool)
+
+
+def test_adapter_rejects_pool_settings_next_to_a_shared_pool() -> None:
+    pool = GeminiKeyPool(clients=[object()])
+    with pytest.raises(ValueError, match="shared pool"):
+        GeminiAssistantAdapter(pool=pool, max_retries=3)
+    with pytest.raises(ValueError, match="shared pool"):
+        LiteValidatorAdapter(pool=pool, judge_template="judge", requests_per_minute=5)
+
+
+@pytest.mark.parametrize(("rpm", "retries"), [(0, 1), (-1, 1), (12, -1)])
+def test_pool_rejects_settings_that_break_throttling(rpm: int, retries: int) -> None:
+    with pytest.raises(ValueError, match="must be"):
+        GeminiKeyPool(clients=[object()], requests_per_minute=rpm, max_retries=retries)
+
+
+# --- review regressions (code review of feat/key-pool-and-skills) -----------------
+
+
+class YieldingTime(FakeTime):
+    """FakeTime whose sleep yields, so a call waiting for its slot lets others run."""
+
+    async def sleep(self, seconds: float) -> None:
+        await super().sleep(seconds)
+        await asyncio.sleep(0)
+
+
+async def test_call_skips_a_key_dropped_while_it_waited_for_its_slot() -> None:
+    log: list[str] = []
+    ft = YieldingTime()
+    pool = _pool(ft, FakeKey("a", log, [forbidden()]), FakeKey("b", log))
+
+    out = await asyncio.gather(_call(pool), _call(pool), _call(pool))
+
+    assert list(out) == ["ok-b", "ok-b", "ok-b"]
+    assert log.count("a") == 1  # the call booked behind a's 403 moved to b
+
+
+async def test_later_shorter_rest_never_cuts_a_per_day_rest_short() -> None:
+    """In-flight call on key a returns a 5s per-minute 429 after a per-day 429 landed."""
+    log: list[str] = []
+    release = asyncio.Event()
+
+    async def call() -> str:
+        log.append("a")
+        if len(log) == 1:
+            await release.wait()
+            raise rate_limited(PER_MINUTE, "5s")
+        raise rate_limited(PER_DAY)
+
+    ft = FakeTime()
+    pool = _pool(ft, SimpleNamespace(call=call))  # type: ignore[arg-type]
+    first = asyncio.create_task(_call(pool))
+    second = asyncio.create_task(_call(pool))
+    await asyncio.gather(second, return_exceptions=True)  # per-day 429 lands first
+    release.set()
+    await asyncio.gather(first, return_exceptions=True)  # then the 5s per-minute 429
+
+    ft.now += 60
+    assert pool.counts() == (0, 1, 0)  # still resting for the day
+
+
+@pytest.mark.parametrize("bad_first", [True, False])
+async def test_exhaustion_error_does_not_depend_on_key_order(bad_first: bool) -> None:
+    def keys(log: list[str]) -> list[Any]:
+        day = _genai_key("day", log, [rate_limited(PER_DAY)])
+        bad = _genai_key("bad", log, [forbidden()])
+        return [bad, day] if bad_first else [day, bad]
+
+    ft = FakeTime()
+    translator_pool = GeminiKeyPool(
+        clients=keys([]), clock=ft.clock, now_utc=ft.utc, sleep=ft.sleep
+    )
+    with pytest.raises(errors.ClientError) as raised:
+        await GeminiAssistantAdapter(pool=translator_pool).translate_section("body", "sys")
+    assert raised.value.code == 429  # the quota, not the dropped key, is the blocker
+
+    validator_pool = GeminiKeyPool(clients=keys([]), clock=ft.clock, now_utc=ft.utc, sleep=ft.sleep)
+    out = await LiteValidatorAdapter(pool=validator_pool, judge_template="judge").validate(
+        (TransliterationCandidate(thai="ก", context="c"),), _rules()
+    )
+    assert out[0].status == "uncertain"
+
+
+async def test_overload_backs_off_before_any_key_retries() -> None:
+    log: list[str] = []
+    ft = FakeTime()
+    pool = _pool(
+        ft,
+        FakeKey("a", log, [overloaded(), overloaded()]),
+        FakeKey("b", log, [overloaded(), overloaded()]),
+    )
+
+    with pytest.raises(errors.ServerError):
+        await _call(pool)
+
+    assert len(log) == 2  # one send, one backoff, one retry · not one send per key
+    assert ft.slept[0] == 1.0  # backoff came before the second send
+    assert pool.counts() == (2, 0, 0)  # a 503 penalises no key
+
+
+async def test_cancelled_wait_gives_its_slot_back() -> None:
+    log: list[str] = []
+    ft = FakeTime()
+    parked = asyncio.Event()
+
+    async def sleep(seconds: float) -> None:
+        ft.slept.append(seconds)
+        if seconds > 0 and not parked.is_set():
+            parked.set()
+            await asyncio.Event().wait()  # park until cancelled
+        ft.now += seconds
+
+    pool = GeminiKeyPool(clients=[FakeKey("a", log)], clock=ft.clock, now_utc=ft.utc, sleep=sleep)
+    await _call(pool)  # books 1000-1005
+    waiting = asyncio.create_task(_call(pool))  # books 1005-1010, then parks
+    await parked.wait()
+    waiting.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiting
+
+    await _call(pool)
+    assert ft.slept[-1] == 5.0  # the cancelled slot was given back, so no 10s wait
+
+
+async def test_every_key_dropped_raises_key_error_then_exhausted() -> None:
+    log: list[str] = []
+    ft = FakeTime()
+    pool = GeminiKeyPool(
+        clients=[_genai_key("a", log, [forbidden()]), _genai_key("b", log, [invalid_key()])],
+        clock=ft.clock,
+        now_utc=ft.utc,
+        sleep=ft.sleep,
+    )
+    translator = GeminiAssistantAdapter(pool=pool)
+    validator = LiteValidatorAdapter(pool=pool, judge_template="judge")
+
+    with pytest.raises(errors.ClientError) as first:
+        await translator.translate_section("body", "sys")
+    assert first.value.code == 400  # the last key error explains the failure
+
+    with pytest.raises(KeyPoolExhaustedError) as later:
+        await validator.validate((TransliterationCandidate(thai="ก", context="c"),), _rules())
+    assert later.value.quota is False  # bad configuration is not degraded to "uncertain"
+    assert len(log) == 2
+
+
+async def test_default_sleep_follows_a_monkeypatched_asyncio_sleep(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    slept: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        slept.append(seconds)
+
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+    pool = GeminiKeyPool(clients=[FakeKey("a", [])])
+    await _call(pool)
+    await _call(pool)
+
+    assert any(s > 4 for s in slept)  # the throttle wait went through the patch
