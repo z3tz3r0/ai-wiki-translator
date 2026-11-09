@@ -1,0 +1,104 @@
+# Phrases check_wikitext.py reports. One per line. `re:` makes the entry a Python regex.
+# Thai has no spaces between words, so a bare phrase can match inside a longer word:
+# use a lookbehind (re:(?<!ไม่)...) to skip the negated form.
+#
+# [strong]  chatbot leftovers, always reported, always a must-fix
+# [mos]     วิกิพีเดีย:คู่มือการเขียน (rev 13162846) and its tutorial, always reported
+# [sign]    patroller AI-writing signs, always reported
+# [raw]     same, but scanned on raw wikitext so URLs inside refs count
+# [soft]    connectives, puffery and ornate wording, reported when 3+ in the text
+
+[strong]
+ในฐานะโมเดลภาษา
+ในฐานะปัญญาประดิษฐ์
+ในฐานะ AI
+หวังว่าจะเป็นประโยชน์
+หากมีคำถามเพิ่มเติม
+ต่อไปนี้คือคำแปล
+นี่คือคำแปล
+แน่นอนครับ
+แน่นอนค่ะ
+เป็นคำถามที่ดี
+
+[mos]
+# era words: write "พ.ศ. 2500", never "ปี พ.ศ. 2500"
+ปี พ.ศ.
+ปี ค.ศ.
+# words the tutorial says to avoid
+re:(?<!ไม่)ชัดเจนว่า
+re:(?<!ไม่)แน่นอน
+ควรทราบว่า
+พึงตระหนักว่า
+re:(?:^|\s)สังเกตว่า
+ในความเป็นจริง
+# time-relative words go stale: give the year instead
+ปัจจุบัน
+ล่าสุด
+# curly quotes: th.wiki uses straight " and '
+“
+”
+‘
+’
+# translation conventions
+สหรัฐอเมริกา
+บิลเลียน
+re:#\d
+# units the style guide says to drop or convert when carried over from English
+ไมล์
+ฟุต
+ปอนด์
+
+[soft]
+นอกจากนี้
+อีกทั้ง
+ยิ่งไปกว่านั้น
+ด้วยเหตุนี้
+ทั้งนี้
+อย่างไรก็ตาม
+อย่างไรก็ดี
+ในขณะเดียวกัน
+ในส่วนของ
+กล่าวคือ
+เป็นที่น่าสังเกตว่า
+เป็นสิ่งสำคัญอย่างยิ่ง
+มีบทบาทสำคัญ
+ถือเป็นก้าวสำคัญ
+สะท้อนให้เห็นถึง
+ตอกย้ำถึง
+อย่างแท้จริง
+ในยุคปัจจุบัน
+อย่างมีนัยสำคัญ
+อย่างมีประสิทธิภาพ
+ทำหน้าที่เป็น
+ถือได้ว่าเป็น
+ถูกออกแบบมาเพื่อ
+ทำให้มั่นใจว่า
+เมื่อพูดถึง
+ในการที่จะ
+ไม่เพียงแต่
+สรุปแล้ว
+โดยรวมแล้ว
+# promotional and ornate wording from the AI-signs page
+มรดกทางวัฒนธรรม
+บรรจงเขียน
+นำไปใช้ประโยชน์
+พยายามกระทำ
+
+# วิกิพีเดีย:สัญญาณของการเขียนด้วยปัญญาประดิษฐ์ (rev 13277686), always reported
+[sign]
+re:^=+\s*รางวัลและการยกย่อง
+re:^=+\s*ความท้าทาย
+re:^=+\s*แนวโน้มในอนาคต
+ประเด็นสำคัญ
+•
+↩
+re:^-{4,}\s*$
+
+# chatbot tracking left in citation URLs: scanned on raw text, refs included
+[raw]
+utm_source=chatgpt.com
+utm_source=openai
+utm_source=copilot.com
+referrer=grok.com
+# a reference the CLI failed to restore (app/domain/references.py)
+re:\[\[\s*REF[_ ]\d+\s*\]\]
