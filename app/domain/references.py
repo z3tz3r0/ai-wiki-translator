@@ -16,8 +16,13 @@ _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 # fully · the legacy `[^<]*` pattern dropped on the first nested `<`.
 _REF_TAG_RE = re.compile(r"<ref(?:[^>]*?)(?:/>|>.*?</ref>)", re.DOTALL)
 
-# `[N]` placeholders inserted by strip_references.
-_REF_PLACEHOLDER_RE = re.compile(r"\[(\d+)\]")
+# `[[REF_n]]` markers inserted by strip_references. The translation prompt
+# (app/prompts/system_instruction_th.md) and the self-consistency scorer use the
+# same form, so the LLM keeps exactly what restore looks for. Spacing variants an
+# LLM may produce ("[[ REF_1 ]]", "[[REF 1]]") still map back. A bare "[12]" in
+# article text is never touched: the old `[N]` placeholder turned it into a ref.
+_REF_MARKER_RE = re.compile(r"\[\[\s*REF[_ ](\d+)\s*\]\]")
+_REF_TARGET_RE = re.compile(r"\s*REF[_ ]\d+\s*")
 
 # Ports legacy `wikipedia_client.py:convert_to_list` regex verbatim.
 _BLOCK_RE = re.compile(
@@ -31,11 +36,16 @@ def remove_comments(wikitext: str) -> str:
     return _COMMENT_RE.sub("", wikitext)
 
 
-def strip_references(wikitext: str) -> tuple[str, dict[str, str]]:
-    """Replace `<ref>...</ref>` (and self-closing) with `[1]`, `[2]`, ...
+def ref_marker(number: int) -> str:
+    """The canonical marker for the ``number``-th reference."""
+    return f"[[REF_{number}]]"
 
-    Returns (cleaned_text, ref_map) where keys are the bracketed placeholders
-    and values are the original `<ref>` strings, in order of appearance.
+
+def strip_references(wikitext: str) -> tuple[str, dict[str, str]]:
+    """Replace `<ref>...</ref>` (and self-closing) with `[[REF_1]]`, `[[REF_2]]`, ...
+
+    Returns (cleaned_text, ref_map) where keys are the markers and values are
+    the original `<ref>` strings, in order of appearance.
     """
     ref_map: dict[str, str] = {}
     counter = 0
@@ -43,7 +53,7 @@ def strip_references(wikitext: str) -> tuple[str, dict[str, str]]:
     def _replace(match: re.Match[str]) -> str:
         nonlocal counter
         counter += 1
-        placeholder = f"[{counter}]"
+        placeholder = ref_marker(counter)
         ref_map[placeholder] = match.group(0)
         return placeholder
 
@@ -51,13 +61,22 @@ def strip_references(wikitext: str) -> tuple[str, dict[str, str]]:
 
 
 def restore_references(text: str, ref_map: Mapping[str, str]) -> str:
-    """Inverse of `strip_references`. Unknown placeholders pass through."""
+    """Inverse of `strip_references`. Unknown markers pass through unchanged."""
 
     def _replace(match: re.Match[str]) -> str:
-        placeholder = match.group(0)
-        return ref_map.get(placeholder, placeholder)
+        return ref_map.get(ref_marker(int(match.group(1))), match.group(0))
 
-    return _REF_PLACEHOLDER_RE.sub(_replace, text)
+    return _REF_MARKER_RE.sub(_replace, text)
+
+
+def count_ref_markers(text: str) -> int:
+    """How many reference markers are still in ``text`` (unrestored refs)."""
+    return len(_REF_MARKER_RE.findall(text))
+
+
+def is_ref_marker(target: str) -> bool:
+    """True when a wikilink target is really a reference marker (``REF_12``)."""
+    return _REF_TARGET_RE.fullmatch(target) is not None
 
 
 def split_into_blocks(wikitext: str) -> list[str]:

@@ -118,15 +118,17 @@ def _good_article(title: str) -> Article:
     """Long-enough article to pass default QualityGate."""
     body = " ".join(f"word{i}" for i in range(700))
     wikitext = f"== Body ==\n\n{body} <ref>r1</ref><ref>r2</ref><ref>r3</ref>\n\nParagraph one.\n"
-    wikitext_no_ref = wikitext.replace("<ref>r1</ref><ref>r2</ref><ref>r3</ref>", "[1][2][3]")
+    wikitext_no_ref = wikitext.replace(
+        "<ref>r1</ref><ref>r2</ref><ref>r3</ref>", "[[REF_1]][[REF_2]][[REF_3]]"
+    )
     return Article(
         title=ArticleTitle(title),
         wikitext=wikitext,
         wikitext_no_ref=wikitext_no_ref,
         ref_map={
-            "[1]": "<ref>r1</ref>",
-            "[2]": "<ref>r2</ref>",
-            "[3]": "<ref>r3</ref>",
+            "[[REF_1]]": "<ref>r1</ref>",
+            "[[REF_2]]": "<ref>r2</ref>",
+            "[[REF_3]]": "<ref>r3</ref>",
         },
         wikilinks=(),
         dictionary={},

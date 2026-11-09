@@ -7,7 +7,10 @@ from collections.abc import Callable
 
 from app.domain.values import Dictionary, Glossary
 
-_WIKILINK_RE = re.compile(r"\[\[(?!File:)(?:([^#|\]]+)(?:#[^|\]]*)?(?:\|([^\]]+))?)\]\]")
+# `[[REF_n]]` reference markers look like links but must pass through untouched.
+_WIKILINK_RE = re.compile(
+    r"\[\[(?!File:)(?!\s*REF[_ ]\d+\s*\]\])(?:([^#|\]]+)(?:#[^|\]]*)?(?:\|([^\]]+))?)\]\]"
+)
 # Bug-fix vs legacy: legacy `(?=\n)` lookahead rejected last-line images, and
 # the redundant 3-way alternation `(.*|\n*?|[^\]]*)` always took the greedy `.*`
 # branch (DOTALL not set). Simplify to a single greedy group with `(?=\n|$)`.

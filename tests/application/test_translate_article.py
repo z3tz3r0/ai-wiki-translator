@@ -67,11 +67,13 @@ def _good_source_article(title: str = EN_TITLE) -> Article:
         "* A bullet item\n\n"
         "[[Category:Psychology]]\n"
     )
-    wikitext_no_ref = wikitext.replace("<ref>r1</ref><ref>r2</ref><ref>r3</ref>", "[1][2][3]")
+    wikitext_no_ref = wikitext.replace(
+        "<ref>r1</ref><ref>r2</ref><ref>r3</ref>", "[[REF_1]][[REF_2]][[REF_3]]"
+    )
     ref_map = {
-        "[1]": "<ref>r1</ref>",
-        "[2]": "<ref>r2</ref>",
-        "[3]": "<ref>r3</ref>",
+        "[[REF_1]]": "<ref>r1</ref>",
+        "[[REF_2]]": "<ref>r2</ref>",
+        "[[REF_3]]": "<ref>r3</ref>",
     }
     return Article(
         title=ArticleTitle(title),
@@ -385,6 +387,28 @@ async def test_reference_markers_restored_in_output() -> None:
     assert "<ref>r1</ref>" in draft.wikitext
     assert "<ref>r2</ref>" in draft.wikitext
     assert "<ref>r3</ref>" in draft.wikitext
+
+
+class MarkerMangler(CountingLLM):
+    """Adds a marker the source never had · it cannot be restored."""
+
+    async def translate_section(self, content: str, system_instruction: str) -> str:
+        return (await super().translate_section(content, system_instruction)) + "[[REF_99]]"
+
+
+async def test_unrestored_reference_markers_are_logged(caplog: pytest.LogCaptureFixture) -> None:
+    src = _good_source_article()
+    uc = _make_use_case(
+        wikipedia=FakeWikipediaReader(
+            articles={(EN_TITLE, "en"): src},
+            langlinks={(TH_TITLE, "th"): {"en": EN_TITLE}},
+        ),
+        llm=MarkerMangler(),
+    )
+    with caplog.at_level("WARNING"):
+        draft = await uc.execute(TranslateArticleCommand(title=TH_TITLE))
+    assert "[[REF_99]]" in draft.wikitext
+    assert any("reference markers were not restored" in r.message for r in caplog.records)
 
 
 async def test_category_blocks_pass_through_unchanged() -> None:

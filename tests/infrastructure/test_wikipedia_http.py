@@ -98,9 +98,10 @@ async def test_fetch_article_strips_references_and_populates_ref_map() -> None:
     article = await reader.fetch_article("Foo", "en")
     assert article is not None
     assert "<ref>" not in article.wikitext_no_ref
-    assert "[1]" in article.wikitext_no_ref
-    assert article.ref_map["[1]"] == "<ref>source A</ref>"
-    assert article.ref_map["[2]"] == "<ref>source B</ref>"
+    assert "[[REF_1]]" in article.wikitext_no_ref
+    assert article.ref_map["[[REF_1]]"] == "<ref>source A</ref>"
+    assert article.ref_map["[[REF_2]]"] == "<ref>source B</ref>"
+    assert not any(link.startswith("REF_") for link in article.wikilinks)
 
 
 async def test_fetch_article_uses_correct_lang_subdomain() -> None:

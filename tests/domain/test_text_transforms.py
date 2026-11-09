@@ -101,3 +101,13 @@ def test_replace_image_does_not_corrupt_duplicate_text() -> None:
     text = "dog [[File:X.jpg|thumb|dog]]\nA dog runs."
     out = replace_image_description(text, {}, str.upper)
     assert out == "dog [[ไฟล์:X.jpg|thumb|DOG]]\nA dog runs."
+
+
+def test_replace_with_dictionary_leaves_reference_markers_alone() -> None:
+    """A `[[REF_n]]` marker looks like a wikilink but must survive untouched."""
+    from app.domain.text_transforms import replace_with_dictionary
+
+    out = replace_with_dictionary(
+        "claim[[REF_3]] and [[Ego]]", {"REF_3": "อ้างอิง_3", "Ego": "อีโก้"}, lambda s: f"t:{s}"
+    )
+    assert out == "claim[[REF_3]] and [[อีโก้]]"

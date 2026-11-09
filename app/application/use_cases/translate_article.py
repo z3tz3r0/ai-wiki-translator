@@ -45,7 +45,7 @@ from app.application.services.source_picker import pick_best_source_language
 from app.domain.classification import classify_section
 from app.domain.entities import Article
 from app.domain.merge import merge_dictionaries
-from app.domain.references import restore_references, split_into_blocks
+from app.domain.references import count_ref_markers, restore_references, split_into_blocks
 from app.domain.text_transforms import (
     replace_bullet_point,
     replace_image_description,
@@ -279,7 +279,13 @@ class TranslateArticleUseCase:
 
         joined = "\n\n".join(translated)
         logger.info("all sections translated; restoring %d refs", len(source_article.ref_map))
-        return restore_references(joined, source_article.ref_map)
+        restored = restore_references(joined, source_article.ref_map)
+        leftover = count_ref_markers(restored)
+        if leftover:
+            logger.warning(
+                "%d reference markers were not restored · search the draft for [[REF_", leftover
+            )
+        return restored
 
     async def _save_rejection(
         self,

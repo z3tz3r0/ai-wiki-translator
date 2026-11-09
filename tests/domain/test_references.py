@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from app.domain.references import (
+    count_ref_markers,
+    is_ref_marker,
     remove_comments,
     restore_references,
     split_into_blocks,
@@ -26,15 +28,15 @@ def test_remove_comments_multiline() -> None:
 def test_strip_references_numbered() -> None:
     text = "text<ref>citation</ref>more"
     out, ref_map = strip_references(text)
-    assert out == "text[1]more"
-    assert ref_map == {"[1]": "<ref>citation</ref>"}
+    assert out == "text[[REF_1]]more"
+    assert ref_map == {"[[REF_1]]": "<ref>citation</ref>"}
 
 
 def test_strip_references_self_closing() -> None:
     text = "text<ref name='x' />more"
     out, ref_map = strip_references(text)
-    assert out == "text[1]more"
-    assert ref_map == {"[1]": "<ref name='x' />"}
+    assert out == "text[[REF_1]]more"
+    assert ref_map == {"[[REF_1]]": "<ref name='x' />"}
 
 
 def test_strip_then_restore_roundtrip() -> None:
@@ -45,7 +47,7 @@ def test_strip_then_restore_roundtrip() -> None:
 
 
 def test_restore_unknown_key_passthrough() -> None:
-    assert restore_references("see [99]", {}) == "see [99]"
+    assert restore_references("see [[REF_99]]", {}) == "see [[REF_99]]"
 
 
 def test_split_into_blocks_basic() -> None:
@@ -57,13 +59,13 @@ def test_split_into_blocks_basic() -> None:
 
 
 def test_strip_references_sequential_numbering() -> None:
-    """Multiple refs receive incrementing [1], [2] placeholders in source order."""
+    """Multiple refs receive incrementing [[REF_1]], [[REF_2]] markers in source order."""
     text = "a<ref>first</ref>b<ref name='x' />c"
     out, ref_map = strip_references(text)
-    assert out == "a[1]b[2]c"
+    assert out == "a[[REF_1]]b[[REF_2]]c"
     assert ref_map == {
-        "[1]": "<ref>first</ref>",
-        "[2]": "<ref name='x' />",
+        "[[REF_1]]": "<ref>first</ref>",
+        "[[REF_2]]": "<ref name='x' />",
     }
 
 
@@ -75,5 +77,27 @@ def test_strip_references_nested_tags() -> None:
     """
     text = "text<ref><cite>Author, 2024</cite></ref>tail"
     out, ref_map = strip_references(text)
-    assert out == "text[1]tail"
-    assert ref_map == {"[1]": "<ref><cite>Author, 2024</cite></ref>"}
+    assert out == "text[[REF_1]]tail"
+    assert ref_map == {"[[REF_1]]": "<ref><cite>Author, 2024</cite></ref>"}
+
+
+def test_restore_tolerates_spacing_variants_of_the_marker() -> None:
+    """LLMs sometimes pad or respace the marker · it must still map back."""
+    ref_map = {"[[REF_1]]": "<ref>a</ref>", "[[REF_2]]": "<ref>b</ref>"}
+    assert restore_references("x[[ REF_1 ]] y[[REF 2]]", ref_map) == "x<ref>a</ref> y<ref>b</ref>"
+
+
+def test_restore_leaves_literal_bracketed_numbers_alone() -> None:
+    """Regression: the old `[N]` placeholder turned a literal "[12]" into a reference."""
+    ref_map = {"[[REF_12]]": "<ref>a</ref>"}
+    assert restore_references("see note [12] here", ref_map) == "see note [12] here"
+
+
+def test_count_ref_markers_finds_unrestored_markers() -> None:
+    assert count_ref_markers("a[[REF_3]] b [[ REF_4 ]] c [12]") == 2
+
+
+def test_is_ref_marker_matches_link_targets_that_are_markers() -> None:
+    assert is_ref_marker("REF_55")
+    assert is_ref_marker(" REF 7 ")
+    assert not is_ref_marker("Reference manager")

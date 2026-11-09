@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 
 from app.domain.entities import Article
-from app.domain.references import remove_comments, strip_references
+from app.domain.references import is_ref_marker, remove_comments, strip_references
 from app.domain.values import ArticleTitle
 
 _WIKILINK_RE = re.compile(r"\[\[(?!File:|Category:)([^#|\]]+)(?:#[^|\]]*)?(?:\|[^\]]+)?\]\]")
@@ -113,7 +113,7 @@ def _extract_wikilinks(wikitext: str) -> tuple[str, ...]:
     out: list[str] = []
     for match in _WIKILINK_RE.finditer(wikitext):
         target = match.group(1).strip()
-        if not target or target in seen:
+        if not target or target in seen or is_ref_marker(target):
             continue
         seen.add(target)
         out.append(target)
