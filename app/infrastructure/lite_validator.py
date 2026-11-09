@@ -5,11 +5,13 @@ call per article (regardless of candidate count) to Gemini Flash-Lite,
 asks for JSON-formatted verdicts, parses them back into typed
 ``TransliterationVerdict`` tuples.
 
-Mirrors ``GeminiAssistantAdapter``'s multi-key load balancing,
-per-key throttle, and 429/503 retry logic. Differences:
+Key rotation and quota handling come from ``GeminiKeyPool``, which this
+adapter can share with ``GeminiAssistantAdapter``. Differences:
 
 * Generation config sets ``response_mime_type="application/json"`` so
   the model returns parseable JSON (Gemini honors this in Lite).
+* When quota or model capacity runs out, every candidate comes back
+  ``uncertain`` instead of raising. Other errors still raise.
 * On parse failure (malformed JSON, length mismatch, missing fields),
   falls back to ``uncertain`` for every candidate · the orchestrator
   treats this as ``ok`` status with degraded verdicts, not a
@@ -18,10 +20,8 @@ per-key throttle, and 429/503 retry logic. Differences:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -32,6 +32,8 @@ from app.application.dto import (
     TransliterationCandidate,
     TransliterationVerdict,
 )
+from app.infrastructure.gemini_genai import DEFAULT_GEMINI_MODEL
+from app.infrastructure.gemini_key_pool import GeminiKeyPool, is_quota_exhaustion, resolve_pool
 
 logger = logging.getLogger(__name__)
 
@@ -42,24 +44,28 @@ _STATUS_VALUES: frozenset[str] = frozenset({"approved", "flagged", "uncertain"})
 class LiteValidatorAdapter:
     """`TransliterationValidator` Protocol implementation backed by Gemini Flash-Lite.
 
-    Construct with one or more ``genai.Client`` instances and the
-    system-instruction template (loaded from
-    ``app/prompts/transliteration_judge.md``).
+    Construct with the system-instruction template (loaded from
+    ``app/prompts/transliteration_judge.md``) plus a shared ``pool``, or
+    ``clients`` (one ``genai.Client`` per key) to build a private pool.
     """
 
-    clients: list[Any]
-    judge_template: str
-    model: str = "gemini-flash-lite-latest"
+    clients: list[Any] = field(default_factory=list)
+    judge_template: str = ""
+    model: str = DEFAULT_GEMINI_MODEL
     requests_per_minute: int = 12
     max_retries: int = 1
-    _last_call_at: list[float] = field(default_factory=list, init=False, repr=False)
+    pool: GeminiKeyPool | None = None
+    _pool: GeminiKeyPool = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        if not self.clients:
-            raise ValueError("`clients` must contain at least one Gemini client")
+        self._pool = resolve_pool(
+            self.clients,
+            self.pool,
+            requests_per_minute=self.requests_per_minute,
+            max_retries=self.max_retries,
+        )
         if not self.judge_template.strip():
             raise ValueError("`judge_template` must be non-empty")
-        self._last_call_at = [0.0] * len(self.clients)
 
     async def validate(
         self,
@@ -88,68 +94,24 @@ class LiteValidatorAdapter:
         return verdicts
 
     async def _generate_json(self, prompt: str) -> str | None:
-        """Multi-key call with retry · returns the LLM's text response or None."""
-        sleeps_left = self.max_retries
-        failed_in_burst: set[int] = set()
-        last_exc: Exception | None = None
+        """One pooled call · the LLM's text, or None when quota or capacity ran out."""
+        config = types.GenerateContentConfig(
+            system_instruction=self.judge_template,
+            response_mime_type="application/json",
+        )
 
-        while True:
-            key_index = self._pick_freshest_key(exclude=failed_in_burst)
-            if key_index is None:
-                if sleeps_left <= 0 or last_exc is None:
-                    return None
-                attempt = self.max_retries - sleeps_left
-                delay = _retry_delay_seconds(last_exc, attempt=attempt)
-                logger.warning(
-                    "all %d keys exhausted on %s · sleeping %.1fs",
-                    len(self.clients),
-                    type(last_exc).__name__,
-                    delay,
-                )
-                sleeps_left -= 1
-                await asyncio.sleep(delay)
-                failed_in_burst.clear()
-                continue
+        async def request(client: Any) -> str:
+            response = await client.aio.models.generate_content(
+                model=self.model, contents=prompt, config=config
+            )
+            return response.text or ""
 
-            await self._throttle(key_index)
-            try:
-                config = types.GenerateContentConfig(
-                    system_instruction=self.judge_template,
-                    response_mime_type="application/json",
-                )
-                response = await self.clients[key_index].aio.models.generate_content(
-                    model=self.model,
-                    contents=prompt,
-                    config=config,
-                )
-                self._last_call_at[key_index] = time.monotonic()
-                return response.text or ""
-            except Exception as exc:
-                last_exc = exc
-                self._last_call_at[key_index] = time.monotonic()
-                if not _is_retriable(exc):
-                    raise
-                logger.info(
-                    "key=%d failed with %s · rotating",
-                    key_index,
-                    type(exc).__name__,
-                )
-                failed_in_burst.add(key_index)
-
-    def _pick_freshest_key(self, exclude: set[int]) -> int | None:
-        candidates = [i for i in range(len(self.clients)) if i not in exclude]
-        if not candidates:
-            return None
-        return min(candidates, key=lambda i: self._last_call_at[i])
-
-    async def _throttle(self, key_index: int) -> None:
-        last_at = self._last_call_at[key_index]
-        if last_at == 0.0:
-            return
-        gap = 60.0 / self.requests_per_minute
-        elapsed = time.monotonic() - last_at
-        if elapsed < gap:
-            await asyncio.sleep(gap - elapsed)
+        try:
+            return await self._pool.run(request)
+        except Exception as exc:
+            if is_quota_exhaustion(exc):
+                return None
+            raise
 
 
 def _build_user_prompt(
@@ -225,27 +187,3 @@ def _all_uncertain(
     return tuple(
         TransliterationVerdict(candidate=c, status="uncertain", reason=reason) for c in candidates
     )
-
-
-def _is_retriable(exc: Exception) -> bool:
-    return getattr(exc, "code", None) in (429, 503)
-
-
-def _retry_delay_seconds(exc: Exception, attempt: int = 0) -> float:
-    if getattr(exc, "code", None) == 503:
-        return min(2.0**attempt, 30.0)
-    details = getattr(exc, "details", None) or []
-    if not isinstance(details, list):
-        return 60.0
-    for d in details:
-        if not isinstance(d, dict):
-            continue
-        if not str(d.get("@type", "")).endswith("RetryInfo"):
-            continue
-        raw = d.get("retryDelay", "60s")
-        if isinstance(raw, str) and raw.endswith("s"):
-            try:
-                return float(raw[:-1])
-            except ValueError:
-                pass
-    return 60.0

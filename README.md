@@ -22,7 +22,8 @@ publishing. The Vite + Solid scaffold under `frontend/` is dormant.
 * `uv` for project + virtualenv management
 * One or more free Gemini API keys from
   [Google AI Studio](https://aistudio.google.com/app/apikey). Multi-key
-  rotation is built in · 5 keys gives roughly 75 RPM of free-tier headroom.
+  rotation is built in. Free-tier quota is per Google Cloud project, so
+  each extra key adds capacity only when it comes from its own project.
 
 No Google Cloud project, no service account, no billing. Term-level machine
 translation goes through [Wikimedia MinT](https://translate.wmcloud.org)
@@ -183,8 +184,12 @@ wires the real adapters in `app/interfaces/cli/bootstrap.py`. Tests
 substitute fakes from `tests/fakes/` at the same boundary.
 
 Multi-key Gemini rotation: when you set `GEMINI_API_KEYS=k1,k2,k3`,
-`GeminiAssistantAdapter` builds one client per key and routes each call
-through the least-recently-used key. A 429 on one key fails over to the next.
+`bootstrap` builds one `GeminiKeyPool` (`app/infrastructure/gemini_key_pool.py`)
+with a client per key. Each call claims the key that frees up first, so
+parallel samples spread across keys. A per-minute 429 rests that key for
+Google's `retryDelay`, a per-day 429 rests it until midnight Pacific, and an
+invalid or forbidden key is dropped for the run. Logs name keys by their
+position in `GEMINI_API_KEYS` (`key #2`), never by value.
 
 Self-consistency sampling: each TEXT section is translated N times in
 parallel (default 3) and the candidate with best structural fidelity wins

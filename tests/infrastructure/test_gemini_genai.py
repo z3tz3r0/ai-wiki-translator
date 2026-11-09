@@ -10,7 +10,8 @@ from typing import Any, ClassVar
 import pytest
 
 from app.application.ports import LLMTranslator
-from app.infrastructure.gemini_genai import GeminiAssistantAdapter, _retry_delay_seconds
+from app.infrastructure.gemini_genai import GeminiAssistantAdapter
+from app.infrastructure.gemini_key_pool import retry_delay_seconds as _retry_delay_seconds
 
 
 def _make_fake_client(

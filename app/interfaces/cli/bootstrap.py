@@ -20,7 +20,8 @@ from app.application.use_cases.refresh_rules import RefreshRulesUseCase
 from app.application.use_cases.translate_article import TranslateArticleUseCase
 from app.infrastructure.file_glossary_repo import FileGlossaryRepository
 from app.infrastructure.file_prompt_repo import FilePromptRepository
-from app.infrastructure.gemini_genai import GeminiAssistantAdapter
+from app.infrastructure.gemini_genai import DEFAULT_GEMINI_MODEL, GeminiAssistantAdapter
+from app.infrastructure.gemini_key_pool import GeminiKeyPool
 from app.infrastructure.markdown_draft_storage import MarkdownDraftStorage
 from app.infrastructure.self_consistent_llm import SelfConsistentLLMTranslator
 from app.infrastructure.wikidata_http import WikidataHttpReader
@@ -78,13 +79,13 @@ def build_translate_use_case(*, output_dir: Path | None = None) -> TranslateArti
             "GEMINI_API_KEY (single) or GEMINI_API_KEYS (comma-separated) must be set · "
             "export at least one before running `wiki-translate`"
         )
-    gemini_model = os.environ.get("WIKI_TRANSLATOR_GEMINI_MODEL", "gemini-flash-lite-latest")
+    gemini_model = os.environ.get("WIKI_TRANSLATOR_GEMINI_MODEL", DEFAULT_GEMINI_MODEL)
     samples = int(os.environ.get("WIKI_TRANSLATOR_LLM_SAMPLES", "3"))
+    # One pool per process · pass it to any other Gemini adapter wired here so
+    # every caller sees the same key rests and drops.
+    pool = GeminiKeyPool(clients=[genai.Client(api_key=k) for k in gemini_keys])
     llm = SelfConsistentLLMTranslator(
-        inner=GeminiAssistantAdapter(
-            clients=[genai.Client(api_key=k) for k in gemini_keys],
-            model=gemini_model,
-        ),
+        inner=GeminiAssistantAdapter(pool=pool, model=gemini_model),
         samples=samples,
     )
 

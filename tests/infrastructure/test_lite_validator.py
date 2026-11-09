@@ -15,7 +15,8 @@ from app.application.dto import (
     TransliterationCandidate,
 )
 from app.application.ports import TransliterationValidator
-from app.infrastructure.lite_validator import LiteValidatorAdapter, _retry_delay_seconds
+from app.infrastructure.gemini_key_pool import retry_delay_seconds as _retry_delay_seconds
+from app.infrastructure.lite_validator import LiteValidatorAdapter
 
 _JUDGE_TEMPLATE = "fake judge template"
 
