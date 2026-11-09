@@ -28,11 +28,10 @@ from app.infrastructure.gemini_key_pool import (
     seconds_until_pacific_midnight,
 )
 from app.infrastructure.lite_validator import LiteValidatorAdapter
+from tests.fakes.fake_time import BASE_UTC, FakeTime
 
 PER_MINUTE = "GenerateRequestsPerMinutePerProjectPerModel-FreeTier"
 PER_DAY = "GenerateRequestsPerDayPerProjectPerModel-FreeTier"
-# 2026-11-09 03:00 PST · next Pacific midnight is 21 hours away.
-BASE_UTC = datetime.datetime(2026, 11, 9, 11, 0, tzinfo=datetime.UTC)
 HOURS_21 = 21 * 3600.0
 
 
@@ -88,24 +87,6 @@ def overloaded() -> errors.APIError:
 
 
 # --- fakes -------------------------------------------------------------------
-
-
-class FakeTime:
-    """Monotonic clock, UTC clock and sleep that move together."""
-
-    def __init__(self) -> None:
-        self.now = 1000.0
-        self.slept: list[float] = []
-
-    def clock(self) -> float:
-        return self.now
-
-    def utc(self) -> datetime.datetime:
-        return BASE_UTC + datetime.timedelta(seconds=self.now - 1000.0)
-
-    async def sleep(self, seconds: float) -> None:
-        self.slept.append(seconds)
-        self.now += seconds
 
 
 @dataclass
@@ -330,20 +311,6 @@ async def test_validator_returns_uncertain_when_every_key_rests_for_the_day() ->
     assert out[0].status == "uncertain"
     assert "validator call failed" in out[0].reason
     assert len(log) == 1  # the validator never spent a request
-
-
-def test_adapter_rejects_both_clients_and_pool() -> None:
-    pool = GeminiKeyPool(clients=[object()])
-    with pytest.raises(ValueError, match="not both"):
-        GeminiAssistantAdapter(clients=[object()], pool=pool)
-
-
-def test_adapter_rejects_pool_settings_next_to_a_shared_pool() -> None:
-    pool = GeminiKeyPool(clients=[object()])
-    with pytest.raises(ValueError, match="shared pool"):
-        GeminiAssistantAdapter(pool=pool, max_retries=3)
-    with pytest.raises(ValueError, match="shared pool"):
-        LiteValidatorAdapter(pool=pool, judge_template="judge", requests_per_minute=5)
 
 
 @pytest.mark.parametrize(("rpm", "retries"), [(0, 1), (-1, 1), (12, -1)])

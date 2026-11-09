@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from google.genai import types
@@ -36,7 +36,6 @@ from app.infrastructure.gemini_key_pool import (
     DEFAULT_GEMINI_MODEL,
     GeminiKeyPool,
     is_quota_exhaustion,
-    resolve_pool,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,27 +48,15 @@ class LiteValidatorAdapter:
     """`TransliterationValidator` Protocol implementation backed by Gemini Flash-Lite.
 
     Construct with the system-instruction template (loaded from
-    ``app/prompts/transliteration_judge.md``) plus a shared ``pool``, or
-    ``clients`` (one ``genai.Client`` per key) to build a private pool.
-    ``requests_per_minute`` and ``max_retries`` apply only to a private pool
-    (None means the pool default).
+    ``app/prompts/transliteration_judge.md``) plus the ``pool`` that holds
+    the keys, throttle and retry settings, shared with the translator.
     """
 
-    clients: list[Any] = field(default_factory=list)
+    pool: GeminiKeyPool
     judge_template: str = ""
     model: str = DEFAULT_GEMINI_MODEL
-    requests_per_minute: int | None = None
-    max_retries: int | None = None
-    pool: GeminiKeyPool | None = None
-    _pool: GeminiKeyPool = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._pool = resolve_pool(
-            self.clients,
-            self.pool,
-            requests_per_minute=self.requests_per_minute,
-            max_retries=self.max_retries,
-        )
         if not self.judge_template.strip():
             raise ValueError("`judge_template` must be non-empty")
 
@@ -113,7 +100,7 @@ class LiteValidatorAdapter:
             return response.text or ""
 
         try:
-            return await self._pool.run(request)
+            return await self.pool.run(request)
         except Exception as exc:
             if is_quota_exhaustion(exc):
                 return None

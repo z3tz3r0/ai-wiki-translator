@@ -17,6 +17,7 @@ from app.application.dto import (
 from app.application.ports import TransliterationValidator
 from app.infrastructure.gemini_key_pool import retry_delay_seconds as _retry_delay_seconds
 from app.infrastructure.lite_validator import LiteValidatorAdapter
+from tests.fakes.fake_time import fake_pool
 
 _JUDGE_TEMPLATE = "fake judge template"
 
@@ -54,24 +55,19 @@ def _make_fake_client(
 
 def test_satisfies_protocol() -> None:
     client, _ = _make_fake_client()
-    adapter = LiteValidatorAdapter(clients=[client], judge_template=_JUDGE_TEMPLATE)
+    adapter = LiteValidatorAdapter(pool=fake_pool(client), judge_template=_JUDGE_TEMPLATE)
     assert isinstance(adapter, TransliterationValidator)
-
-
-def test_empty_clients_raises() -> None:
-    with pytest.raises(ValueError, match="clients"):
-        LiteValidatorAdapter(clients=[], judge_template=_JUDGE_TEMPLATE)
 
 
 def test_empty_template_raises() -> None:
     client, _ = _make_fake_client()
     with pytest.raises(ValueError, match="judge_template"):
-        LiteValidatorAdapter(clients=[client], judge_template="   ")
+        LiteValidatorAdapter(pool=fake_pool(client), judge_template="   ")
 
 
 async def test_empty_candidates_returns_empty_without_calling_client() -> None:
     client, calls = _make_fake_client()
-    adapter = LiteValidatorAdapter(clients=[client], judge_template=_JUDGE_TEMPLATE)
+    adapter = LiteValidatorAdapter(pool=fake_pool(client), judge_template=_JUDGE_TEMPLATE)
     out = await adapter.validate((), _ruleset())
     assert out == ()
     assert calls == []
@@ -91,7 +87,7 @@ async def test_validate_parses_well_formed_json() -> None:
         ensure_ascii=False,
     )
     client, _ = _make_fake_client(response_text=payload)
-    adapter = LiteValidatorAdapter(clients=[client], judge_template=_JUDGE_TEMPLATE)
+    adapter = LiteValidatorAdapter(pool=fake_pool(client), judge_template=_JUDGE_TEMPLATE)
     out = await adapter.validate(
         (_candidate("แอนเดอส์ เฮลส์เบิร์ก", "Anders Hejlsberg"),),
         _ruleset(),
@@ -104,7 +100,7 @@ async def test_validate_parses_well_formed_json() -> None:
 
 async def test_validate_falls_back_to_uncertain_on_malformed_json() -> None:
     client, _ = _make_fake_client(response_text="not json")
-    adapter = LiteValidatorAdapter(clients=[client], judge_template=_JUDGE_TEMPLATE)
+    adapter = LiteValidatorAdapter(pool=fake_pool(client), judge_template=_JUDGE_TEMPLATE)
     out = await adapter.validate((_candidate("แอนเดอส์ เฮลส์เบิร์ก"),), _ruleset())
     assert len(out) == 1
     assert out[0].status == "uncertain"
@@ -114,7 +110,7 @@ async def test_validate_falls_back_to_uncertain_on_malformed_json() -> None:
 async def test_validate_falls_back_when_response_length_mismatch() -> None:
     payload = json.dumps([{"thai": "x", "status": "approved"}])  # 1 item for 2 candidates
     client, _ = _make_fake_client(response_text=payload)
-    adapter = LiteValidatorAdapter(clients=[client], judge_template=_JUDGE_TEMPLATE)
+    adapter = LiteValidatorAdapter(pool=fake_pool(client), judge_template=_JUDGE_TEMPLATE)
     out = await adapter.validate(
         (_candidate("ก ก ก"), _candidate("ข ข ข")),
         _ruleset(),
@@ -126,7 +122,7 @@ async def test_validate_falls_back_when_response_length_mismatch() -> None:
 async def test_validate_falls_back_when_json_is_not_list() -> None:
     payload = json.dumps({"status": "approved"})
     client, _ = _make_fake_client(response_text=payload)
-    adapter = LiteValidatorAdapter(clients=[client], judge_template=_JUDGE_TEMPLATE)
+    adapter = LiteValidatorAdapter(pool=fake_pool(client), judge_template=_JUDGE_TEMPLATE)
     out = await adapter.validate((_candidate("แอนเดอส์ เฮลส์เบิร์ก"),), _ruleset())
     assert len(out) == 1
     assert out[0].status == "uncertain"
@@ -135,7 +131,7 @@ async def test_validate_falls_back_when_json_is_not_list() -> None:
 async def test_validate_falls_back_when_item_is_not_object() -> None:
     payload = json.dumps([1])
     client, _ = _make_fake_client(response_text=payload)
-    adapter = LiteValidatorAdapter(clients=[client], judge_template=_JUDGE_TEMPLATE)
+    adapter = LiteValidatorAdapter(pool=fake_pool(client), judge_template=_JUDGE_TEMPLATE)
     out = await adapter.validate((_candidate("แอนเดอส์ เฮลส์เบิร์ก"),), _ruleset())
     assert len(out) == 1
     assert out[0].status == "uncertain"
@@ -144,7 +140,7 @@ async def test_validate_falls_back_when_item_is_not_object() -> None:
 async def test_validate_coerces_unknown_status_to_uncertain() -> None:
     payload = json.dumps([{"status": "totally_invalid", "reason": "x"}])
     client, _ = _make_fake_client(response_text=payload)
-    adapter = LiteValidatorAdapter(clients=[client], judge_template=_JUDGE_TEMPLATE)
+    adapter = LiteValidatorAdapter(pool=fake_pool(client), judge_template=_JUDGE_TEMPLATE)
     out = await adapter.validate((_candidate("แอนเดอส์ เฮลส์เบิร์ก"),), _ruleset())
     assert out[0].status == "uncertain"
 
@@ -152,7 +148,7 @@ async def test_validate_coerces_unknown_status_to_uncertain() -> None:
 async def test_validate_passes_judge_template_as_system_instruction() -> None:
     payload = json.dumps([{"status": "approved"}])
     client, calls = _make_fake_client(response_text=payload)
-    adapter = LiteValidatorAdapter(clients=[client], judge_template="my judge")
+    adapter = LiteValidatorAdapter(pool=fake_pool(client), judge_template="my judge")
     await adapter.validate((_candidate("แอนเดอส์ เฮลส์เบิร์ก"),), _ruleset())
     assert len(calls) == 1
     assert calls[0]["config"].system_instruction == "my judge"
@@ -161,7 +157,7 @@ async def test_validate_passes_judge_template_as_system_instruction() -> None:
 async def test_validate_requests_json_mime_type() -> None:
     payload = json.dumps([{"status": "approved"}])
     client, calls = _make_fake_client(response_text=payload)
-    adapter = LiteValidatorAdapter(clients=[client], judge_template=_JUDGE_TEMPLATE)
+    adapter = LiteValidatorAdapter(pool=fake_pool(client), judge_template=_JUDGE_TEMPLATE)
     await adapter.validate((_candidate("แอนเดอส์ เฮลส์เบิร์ก"),), _ruleset())
     assert calls[0]["config"].response_mime_type == "application/json"
 
@@ -170,7 +166,7 @@ async def test_validate_uses_configured_model() -> None:
     payload = json.dumps([{"status": "approved"}])
     client, calls = _make_fake_client(response_text=payload)
     adapter = LiteValidatorAdapter(
-        clients=[client],
+        pool=fake_pool(client),
         judge_template=_JUDGE_TEMPLATE,
         model="custom-model",
     )
@@ -198,7 +194,7 @@ async def test_validate_load_balances_across_keys() -> None:
 
     c1, hits1 = make_marked_client("k1")
     c2, hits2 = make_marked_client("k2")
-    adapter = LiteValidatorAdapter(clients=[c1, c2], judge_template=_JUDGE_TEMPLATE)
+    adapter = LiteValidatorAdapter(pool=fake_pool(c1, c2), judge_template=_JUDGE_TEMPLATE)
 
     cand = (_candidate("แอนเดอส์ เฮลส์เบิร์ก"),)
     await adapter.validate(cand, _ruleset())
@@ -222,9 +218,8 @@ async def test_validate_429_falls_back_to_uncertain() -> None:
         aio=SimpleNamespace(models=SimpleNamespace(generate_content=always_429))
     )
     adapter = LiteValidatorAdapter(
-        clients=[client],
+        pool=fake_pool(client, max_retries=1),
         judge_template=_JUDGE_TEMPLATE,
-        max_retries=1,
     )
     out = await adapter.validate((_candidate("แอนเดอส์ เฮลส์เบิร์ก"),), _ruleset())
     # All 429s exhausted · adapter falls back to all-uncertain (not raise).
@@ -238,7 +233,7 @@ async def test_validate_non_retriable_exception_propagates() -> None:
         raise RuntimeError("something else")
 
     client = SimpleNamespace(aio=SimpleNamespace(models=SimpleNamespace(generate_content=boom)))
-    adapter = LiteValidatorAdapter(clients=[client], judge_template=_JUDGE_TEMPLATE)
+    adapter = LiteValidatorAdapter(pool=fake_pool(client), judge_template=_JUDGE_TEMPLATE)
     with pytest.raises(RuntimeError, match="something else"):
         await adapter.validate((_candidate("แอนเดอส์ เฮลส์เบิร์ก"),), _ruleset())
 

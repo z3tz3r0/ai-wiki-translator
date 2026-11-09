@@ -289,31 +289,6 @@ class GeminiKeyPool:
         )
 
 
-def resolve_pool(
-    clients: list[Any],
-    pool: GeminiKeyPool | None,
-    *,
-    requests_per_minute: int | None,
-    max_retries: int | None,
-) -> GeminiKeyPool:
-    """Adapter helper · use the shared ``pool``, or build a private one from ``clients``."""
-    if pool is not None and clients:
-        raise ValueError("pass `clients` or a shared `pool`, not both")
-    if pool is not None:
-        if requests_per_minute is not None or max_retries is not None:
-            raise ValueError(
-                "set `requests_per_minute` and `max_retries` on the shared pool, not the adapter"
-            )
-        return pool
-    return GeminiKeyPool(
-        clients=clients,
-        requests_per_minute=(
-            DEFAULT_REQUESTS_PER_MINUTE if requests_per_minute is None else requests_per_minute
-        ),
-        max_retries=DEFAULT_MAX_RETRIES if max_retries is None else max_retries,
-    )
-
-
 def classify(exc: BaseException) -> FailureKind:
     """Decide what a failed call says about the key that made it."""
     code = getattr(exc, "code", None)

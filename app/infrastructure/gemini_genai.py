@@ -9,37 +9,24 @@ transliteration validator.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from google.genai import types
 
-from app.infrastructure.gemini_key_pool import DEFAULT_GEMINI_MODEL, GeminiKeyPool, resolve_pool
+from app.infrastructure.gemini_key_pool import DEFAULT_GEMINI_MODEL, GeminiKeyPool
 
 
 @dataclass
 class GeminiAssistantAdapter:
     """`LLMTranslator` Protocol implementation backed by Google Gemini.
 
-    Pass a shared ``pool``, or ``clients`` (one ``genai.Client`` per key) to
-    build a private pool. ``requests_per_minute`` and ``max_retries`` apply
-    only to a private pool (None means the pool default).
+    ``pool`` holds the keys, throttle and retry settings, and is meant to be
+    shared with every other Gemini adapter in the process.
     """
 
-    clients: list[Any] = field(default_factory=list)
+    pool: GeminiKeyPool
     model: str = DEFAULT_GEMINI_MODEL
-    requests_per_minute: int | None = None
-    max_retries: int | None = None
-    pool: GeminiKeyPool | None = None
-    _pool: GeminiKeyPool = field(init=False, repr=False)
-
-    def __post_init__(self) -> None:
-        self._pool = resolve_pool(
-            self.clients,
-            self.pool,
-            requests_per_minute=self.requests_per_minute,
-            max_retries=self.max_retries,
-        )
 
     async def translate_section(self, content: str, system_instruction: str) -> str:
         config = types.GenerateContentConfig(system_instruction=system_instruction)
@@ -50,4 +37,4 @@ class GeminiAssistantAdapter:
             )
             return response.text or ""
 
-        return await self._pool.run(request)
+        return await self.pool.run(request)
