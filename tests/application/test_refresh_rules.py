@@ -67,15 +67,13 @@ async def test_execute_swallows_parse_error_and_continues(tmp_path: Path) -> Non
 async def test_execute_propagates_oserror_from_disk(tmp_path: Path) -> None:
     """``OSError`` during write must propagate (not be swallowed)."""
     fake = FakeTransliterationRuleSource(results={"en": _ruleset("en")})
-    parent = tmp_path / "ro"
-    parent.mkdir()
-    parent.chmod(0o500)  # read-only · child mkdir + write fail
-    try:
-        use_case = RefreshRulesUseCase(source=fake, rules_dir=parent / "child")
-        with pytest.raises(OSError):
-            await use_case.execute(["en"])
-    finally:
-        parent.chmod(0o700)
+    # A regular file where the parent directory should be · the write fails on
+    # every OS (chmod-read-only dirs still accept writes on Windows).
+    blocker = tmp_path / "not-a-dir"
+    blocker.write_text("x", encoding="utf-8")
+    use_case = RefreshRulesUseCase(source=fake, rules_dir=blocker / "child")
+    with pytest.raises(OSError):
+        await use_case.execute(["en"])
 
 
 async def test_execute_returns_results_in_input_order(tmp_path: Path) -> None:

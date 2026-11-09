@@ -197,7 +197,8 @@ def test_queue_passes_overrides_to_command(
     glossary_path = tmp_path / "g.txt"
     queue_file = tmp_path / "queue.toml"
     queue_file.write_text(
-        f'[[entry]]\ntitle = "X"\nsource_lang = "ja"\nglossary = "{glossary_path}"\n',
+        # TOML literal string (single quotes) · a Windows path's `\U` is not an escape there.
+        f'[[entry]]\ntitle = "X"\nsource_lang = "ja"\nglossary = \'{glossary_path}\'\n',
         encoding="utf-8",
     )
     captured: list[TranslateArticleCommand] = []
